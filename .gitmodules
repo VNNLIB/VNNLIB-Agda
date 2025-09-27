@@ -1,0 +1,3 @@
+[submodule "VNNLIB-Standard"]
+	path = VNNLIB-Standard
+	url = https://github.com/VNNLIB/VNNLIB-Standard
