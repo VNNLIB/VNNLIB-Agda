@@ -1,4 +1,3 @@
-MAlonzo/**
+src/MAlonzo/**
 _build/**
 src/Syntax/**
-!src/Syntax/AST.agda
