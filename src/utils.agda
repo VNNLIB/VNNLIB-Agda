@@ -19,3 +19,7 @@ p =ᵇ q = (q ≤ᵇ p) ∧ (p ≤ᵇ q)
 
 _≠ᵇ_ : ℚ → ℚ → Bool
 p ≠ᵇ q = not ((q ≤ᵇ p) ∧ (p ≤ᵇ q))
+
+lookup-map : {A B : Set} → (f : A → B) → (xs : List A) → (i : Fin (length xs)) → lookup (map f xs) (cast (sym (length-map f xs)) i) ≡ f (lookup xs i)
+lookup-map f (x ∷ a) zero = refl
+lookup-map f (x ∷ a) (suc b) = lookup-map f a b
