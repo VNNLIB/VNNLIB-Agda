@@ -11,6 +11,8 @@ open import Data.Integer as ℤ using (∣_∣)
 open import vnnlib-types as 𝐄
 open import Data.Maybe using (Maybe)
 open import Data.Nat.Show
+open import Data.List.Relation.Unary.Any
+open import Relation.Nullary
 open import types-utils
 
 open import Level
@@ -59,6 +61,53 @@ convertElementType elementTypeString = stringType
 convertVariableName : 𝐁.VariableName → 𝐕.VariableName
 convertVariableName (variableName (#pair x x₁)) = SVariableName x₁
 
+-- Get variable Names
+inputVarsᵥ : 𝐕.InputDefinition → 𝐕.VariableName
+inputVarsᵥ (declareInput x _ _) = x
+
+hiddenVars : 𝐁.HiddenDefinition → 𝐁.VariableName
+hiddenVars (hiddenDef x₁ e t x₂) = x₁
+
+outputVars : 𝐁.OutputDefinition → 𝐁.VariableName
+outputVars (outputDef x e t) = x
+outputVars (outputOnnxDef x₁ e t x₂) = x₁
+
+outputVarsᵥ : 𝐕.OutputDefinition → 𝐕.VariableName
+outputVarsᵥ (declareOutput x _ _) = x
+
+getCompStms : 𝐁.NetworkDefinition → List 𝐁.CompStm
+getCompStms (networkDef _ cs _ _ _) = cs
+
+getCompStmName : 𝐁.CompStm → 𝐁.VariableName
+getCompStmName (isomorphicTo x) = x
+getCompStmName (equalTo x) = x
+
+getInputDefs : 𝐁.NetworkDefinition → List 𝐁.InputDefinition
+getInputDefs (networkDef _ _ is _ _) = is
+
+getInputDefsᵥ : 𝐕.NetworkDefinition → List 𝐕.InputDefinition
+getInputDefsᵥ (declareNetwork _ is _) = is
+
+getOutputDefs : 𝐁.NetworkDefinition → List 𝐁.OutputDefinition
+getOutputDefs (networkDef _ _ _ _ os) = os
+
+getOutputDefsᵥ : 𝐕.NetworkDefinition → List 𝐕.OutputDefinition
+getOutputDefsᵥ (declareNetwork _ _ os) = os
+
+getNetworkName : 𝐁.NetworkDefinition → 𝐁.VariableName
+getNetworkName (networkDef x _ _ _ _) = x
+
+getNetworkNameᵥ : 𝐕.NetworkDefinition → 𝐕.VariableName
+getNetworkNameᵥ (declareNetwork x _ _) = x
+
+
+inclNetworkDefsCompStm : 𝐁.NetworkDefinition → Bool
+inclNetworkDefsCompStm (networkDef _ cs _ _ _) = 1 ≤ᵇ List.length cs
+
+inclNetworkDefsHiddenDefs : 𝐁.NetworkDefinition → Bool
+inclNetworkDefsHiddenDefs (networkDef _ _ _ hs _) = 1 ≤ᵇ List.length hs
+
+
 -- convert a list of number to valid numbers
 parseNumbersList : List 𝐁.Number → Result (List ℕ)
 parseNumbersList [] = success []
@@ -102,49 +151,32 @@ appendOutputs os o = do
   return (o' ∷ os')
 
 convertNetworkDefinition : 𝐁.NetworkDefinition → Result (𝐕.NetworkDefinition)
-convertNetworkDefinition (networkDef x _ is _ os) = do
-  is' ← List.foldl appendInputs (success []) is
-  os' ← List.foldl appendOutputs (success []) os
-  return (declareNetwork (convertVariableName x) is' os')
+convertNetworkDefinition (networkDef x _ is _ os) with convertListToList⁺ is | convertListToList⁺ os
+... | error _ | error _ = error "Network Definitions must have inputs and outputs"
+... | error _ | success y = error "Network Definitions must have inputs"
+... | success y | error _ = error "Network Definitions must have outputs"
+... | success y | success y₁ = do
+      is' ← List.foldl appendInputs (success []) is
+      os' ← List.foldl appendOutputs (success []) os
+      return (declareNetwork (convertVariableName x) is' os')
+
+isDefinedNetworkName : List 𝐕.NetworkDefinition → List 𝐁.CompStm → Bool
+isDefinedNetworkName ns [] = true
+isDefinedNetworkName ns (x ∷ xs) with any? (λ n → ⟦ getCompStmName x ⟧asString String.≟ ⟦ getNetworkNameᵥ n ⟧asStringᵥ) ns
+... | no ¬p = isDefinedNetworkName ns xs
+... | yes p = true
 
 appendNetworks : Result (List 𝐕.NetworkDefinition) → 𝐁.NetworkDefinition → Result (List 𝐕.NetworkDefinition)
-appendNetworks ns n = do
-  n' ← convertNetworkDefinition n
-  ns' ← ns
-  return ( n' ∷ ns' )
+appendNetworks (error x) n = error x
+appendNetworks (success ns) n with any? (λ x → ⟦ getNetworkName n ⟧asString String.≟ ⟦ getNetworkNameᵥ x ⟧asStringᵥ) ns
+... | yes p = error "Networks cannot have duplicate names"
+... | no ¬p = if isDefinedNetworkName ns (getCompStms n)
+              then (do
+                n' ← convertNetworkDefinition n
+                return ( n' ∷ ns ))
+              else error "Undefined Network name used"
 
-convertNetworkDefs : List⁺ 𝐁.NetworkDefinition → Result (List 𝐕.NetworkDefinition)
+convertNetworkDefs : List 𝐁.NetworkDefinition → Result (List 𝐕.NetworkDefinition)
 convertNetworkDefs networkDefs = do
-  ns' ← List.foldl appendNetworks (success []) (toList networkDefs)
+  ns' ← List.foldl appendNetworks (success []) networkDefs
   return ns'
-
-inclNetworkDefsCompStm : 𝐁.NetworkDefinition → Bool
-inclNetworkDefsCompStm (networkDef _ cs _ _ _) = 1 ≤ᵇ List.length cs
-
-inclNetworkDefsHiddenDefs : 𝐁.NetworkDefinition → Bool
-inclNetworkDefsHiddenDefs (networkDef _ _ _ hs _) = 1 ≤ᵇ List.length hs
-
--- Get variable Names
-inputVars : 𝐁.InputDefinition → 𝐁.VariableName
-inputVars (inputDef x e t) = x
-inputVars (inputOnnxDef x₁ e t x₂) = x₁
-
-hiddenVars : 𝐁.HiddenDefinition → 𝐁.VariableName
-hiddenVars (hiddenDef x₁ e t x₂) = x₁
-
-outputVars : 𝐁.OutputDefinition → 𝐁.VariableName
-outputVars (outputDef x e t) = x
-outputVars (outputOnnxDef x₁ e t x₂) = x₁
-
-getCompStms : 𝐁.NetworkDefinition → List 𝐁.CompStm
-getCompStms (networkDef _ cs _ _ _) = cs
-
-getInputDefs : 𝐁.NetworkDefinition → List 𝐁.InputDefinition
-getInputDefs (networkDef _ _ is _ _) = is
-
-getOutputDefs : 𝐁.NetworkDefinition → List 𝐁.OutputDefinition
-getOutputDefs (networkDef _ _ _ _ os) = os
-
-getNetworkName : 𝐁.NetworkDefinition → 𝐁.VariableName
-getNetworkName (networkDef x _ _ _ _) = x
-    

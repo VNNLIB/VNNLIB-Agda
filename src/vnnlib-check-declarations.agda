@@ -46,22 +46,18 @@ fromVariableBindingᵢ (var x x₁ x₂) = declareInput x x₂ x₁
 fromVariableBindingₒ : VariableBinding → 𝐕.OutputDefinition
 fromVariableBindingₒ (var x x₁ x₂) = declareOutput x x₂ x₁
 
+toVariableBindingᵢ : 𝐕.InputDefinition → VariableBinding
+toVariableBindingᵢ (declareInput x x₁ x₂) = var x x₂ x₁
 
-toVariableBindingᵢ : 𝐁.InputDefinition → VariableBinding
-toVariableBindingᵢ (inputDef x e t) = var (convertVariableName x) (convertTensorShape t) (convertElementType e)
-toVariableBindingᵢ (inputOnnxDef x₁ e t x₂) = var (convertVariableName x₁) (convertTensorShape t) (convertElementType e)
-
-toVariableBindingₒ : 𝐁.OutputDefinition → VariableBinding
-toVariableBindingₒ (outputDef x e t) = var (convertVariableName x) (convertTensorShape t) (convertElementType e)
-toVariableBindingₒ (outputOnnxDef x₁ e t x₂) = var (convertVariableName x₁) (convertTensorShape t) (convertElementType e)
-
+toVariableBindingₒ : 𝐕.OutputDefinition → VariableBinding
+toVariableBindingₒ (declareOutput x x₁ x₂) = var x x₂ x₁
 
 record NetworkBinding : Set where
   constructor
     networkBinding
   field
-    inputs : List⁺ VariableBinding
-    outputs : List⁺ VariableBinding
+    inputs : List VariableBinding
+    outputs : List VariableBinding
 
 CheckContextPair : Set
 CheckContextPair = NetworkBinding × 𝐕.NetworkDefinition
@@ -70,24 +66,24 @@ CheckContext : Set
 CheckContext = List (CheckContextPair)
 
 convertNetworkBindingToDef : 𝐕.VariableName → NetworkBinding → 𝐕.NetworkDefinition
-convertNetworkBindingToDef networkName (networkBinding inputs₁ outputs₁) = declareNetwork networkName (List.map fromVariableBindingᵢ (toList inputs₁)) (List.map fromVariableBindingₒ (toList outputs₁))
+convertNetworkBindingToDef networkName (networkBinding inputs₁ outputs₁) = declareNetwork networkName (List.map fromVariableBindingᵢ inputs₁) (List.map fromVariableBindingₒ (outputs₁))
 
 
 -- get DeBrujin's index from context
 open NetworkBinding
 
-variableIndexInNetworkᵢₙₚᵤₜ : (n : NetworkBinding) → (varName : 𝐁.VariableName) → Result (Fin (List.length (toList (inputs n))))
-variableIndexInNetworkᵢₙₚᵤₜ Ν name with any? (λ x → ⟦ name ⟧asString String.≟ ⟦ getVariableNameⱽ x ⟧asStringᵥ) (toList (inputs Ν))
+variableIndexInNetworkᵢₙₚᵤₜ : (n : NetworkBinding) → (varName : 𝐕.VariableName) → Result (Fin (List.length (inputs n)))
+variableIndexInNetworkᵢₙₚᵤₜ Ν name with any? (λ x → ⟦ name ⟧asStringᵥ String.≟ ⟦ getVariableNameⱽ x ⟧asStringᵥ) ((inputs Ν))
 ... | yes p = success (index p)
 ... | no ¬p = error "Variable Name not in inputs"
 
-variableIndexInNetworkₒᵤₜₚᵤₜ : (n : NetworkBinding) → (varName : 𝐁.VariableName) → Result (Fin (List.length (toList (outputs n))))
-variableIndexInNetworkₒᵤₜₚᵤₜ Ν name with any? (λ x → ⟦ name ⟧asString String.≟ ⟦ getVariableNameⱽ x ⟧asStringᵥ) (toList (outputs Ν))
+variableIndexInNetworkₒᵤₜₚᵤₜ : (n : NetworkBinding) → (varName : 𝐕.VariableName) → Result (Fin (List.length ((outputs n))))
+variableIndexInNetworkₒᵤₜₚᵤₜ Ν name with any? (λ x → ⟦ name ⟧asStringᵥ String.≟ ⟦ getVariableNameⱽ x ⟧asStringᵥ) ((outputs Ν))
 ... | yes p = success (index p)
 ... | no ¬p = error "Variable Input Name must be unique"
 
 -- the network index is derived if the variable is in its inputs or outputs
-checkNetworkIndex : (varName : 𝐁.VariableName) → (n : NetworkBinding) → Result Bool -- the Bool is placeholder enum type
+checkNetworkIndex : (varName : 𝐕.VariableName) → (n : NetworkBinding) → Result Bool -- the Bool is placeholder enum type
 checkNetworkIndex varName Ν with variableIndexInNetworkᵢₙₚᵤₜ Ν varName
 ... | success x = success (true)
 ... | error _ with variableIndexInNetworkₒᵤₜₚᵤₜ Ν varName
@@ -101,123 +97,60 @@ isResultSuccess (success _) = true
 getNetworkBindings : CheckContext → List NetworkBinding
 getNetworkBindings Γ = List.map proj₁ Γ
 
-variableNetworkIndex : (varName : 𝐁.VariableName) → (l : CheckContext) → Result (Fin (List.length l))
+variableNetworkIndex : (varName : 𝐕.VariableName) → (l : CheckContext) → Result (Fin (List.length l))
 variableNetworkIndex varName Γ with any? (λ x → isResultSuccess x Bool.≟ true) (List.map (checkNetworkIndex varName ∘ proj₁) Γ)
 ... | yes p = success (subst Fin equal-length (index p))
   where
     equal-length : List.length (List.map (checkNetworkIndex varName ∘ proj₁) Γ) ≡ List.length Γ
     equal-length = length-map (checkNetworkIndex varName ∘ proj₁) Γ
-... | no ¬p = error ""
+... | no ¬p = error "Variable not found in network context"
 
-isVariableNameInVariableBinding : 𝐁.VariableName → List⁺ VariableBinding → Bool
-isVariableNameInVariableBinding varName vars with any? (λ x → ⟦ varName ⟧asString String.≟ ⟦ getVariableNameⱽ x ⟧asStringᵥ) (toList vars)
+isVariableNameInVariableBinding : 𝐕.VariableName → List VariableBinding → Bool
+isVariableNameInVariableBinding varName vars with any? (λ x → ⟦ varName ⟧asStringᵥ String.≟ ⟦ getVariableNameⱽ x ⟧asStringᵥ) vars
 ... | yes _ = true
 ... | no _ = false
 
 
 -- Check the current context and interatively built Variable Binding to determine if the adding variable name is unique
-isVariableNameUnique : 𝐁.VariableName → CheckContext → List VariableBinding → Bool
-isVariableNameUnique varName Γ vars with variableNetworkIndex varName Γ -- checking for the repeated name in the context
-... | success x = false
-... | error _ with convertListToList⁺ vars
-... | error _ = true
-... | success vars⁺ = not (isVariableNameInVariableBinding varName vars⁺) -- checking if variable name is unique
+isVariableNameUnique : 𝐕.VariableName → CheckContext → List VariableBinding → Bool
+isVariableNameUnique varName Γ vars with variableNetworkIndex varName Γ 
+... | error x = not (isVariableNameInVariableBinding varName vars)
+... | success y = false
 
--- Make CheckContext from 𝐁.Network Definitions
------------ Add network Inputs -----------------
-mkNetworkInputs₁ : List⁺ 𝐁.InputDefinition → Result (List⁺ VariableBinding)
-mkNetworkInputs₁ is = List⁺.foldl addInputVarₙ addInputVar₁ is
-  where
-    addInputVar₁ : 𝐁.InputDefinition → Result (List⁺ VariableBinding)
-    addInputVar₁ i = success (List⁺.[ toVariableBindingᵢ i ])
-    
-    addInputVarₙ : Result (List⁺ VariableBinding) → 𝐁.InputDefinition → Result (List⁺ VariableBinding)
-    addInputVarₙ (error _) i = error ""
-    addInputVarₙ (success n) i with inputVars i
-    ... | varName with isVariableNameInVariableBinding varName n -- checking for the repeated name in the iteratively built inputVars list
-    ... | true = error ""
-    ... | false = success(toVariableBindingᵢ i ∷⁺ n)
 
-mkNetworkInputsₙ : CheckContext → List⁺ 𝐁.InputDefinition → Result (List⁺ VariableBinding)
-mkNetworkInputsₙ Γ is = List⁺.foldl addInputVarₙ addInputVar₁ is
-  where
-    addInputVar₁ : 𝐁.InputDefinition → Result (List⁺ VariableBinding)
-    addInputVar₁ i with inputVars i
-    ... | varNameᵢ with isVariableNameUnique varNameᵢ Γ []
-    ... | false = error ""
-    ... | true = success (List⁺.[ toVariableBindingᵢ i ])
-    
-    addInputVarₙ : Result (List⁺ VariableBinding) → 𝐁.InputDefinition → Result (List⁺ VariableBinding)
-    addInputVarₙ (error _) i = error ""
-    addInputVarₙ (success n) i with inputVars i
-    ... | varName with isVariableNameUnique varName Γ (toList n) -- checking for the repeated name in the iteratively built inputVars list
-    ... | false = error ""
-    ... | true = success (toVariableBindingᵢ i ∷⁺ n)
+-- Scope checking inputs and outputs
+mkNetworkInputs : CheckContext → List 𝐕.InputDefinition → Result (List VariableBinding)
+mkNetworkInputs Γ is = List.foldl addInputVarₙ (success []) is
+  where    
+    addInputVarₙ : Result (List VariableBinding) → 𝐕.InputDefinition → Result (List VariableBinding)
+    addInputVarₙ (error e) i = error e
+    addInputVarₙ (success varsᵢ) i =
+      let varName = inputVarsᵥ i in if isVariableNameUnique varName Γ varsᵢ then success (toVariableBindingᵢ i ∷ varsᵢ) else error "Variable Names must be unique"
 
 ------------- Add network outputs ----------------
+mkNetworkOutputs : CheckContext → List VariableBinding → List 𝐕.OutputDefinition → Result (List VariableBinding)
+mkNetworkOutputs Γ varsᵢ os = List.foldl addOutputVarₙ (success []) os
+  where    
+    addOutputVarₙ : Result (List VariableBinding) → 𝐕.OutputDefinition → Result (List VariableBinding)
+    addOutputVarₙ (error e) _ = error e
+    addOutputVarₙ (success varsₒ) o =
+      let varName = (outputVarsᵥ o) in if isVariableNameUnique varName Γ varsᵢ ∧ isVariableNameUnique varName Γ varsₒ
+      then success (toVariableBindingₒ o ∷ varsₒ) else error "Variable Names must be unique"
 
-mkNetworkOutputs₁ : List⁺ VariableBinding → List⁺ 𝐁.OutputDefinition → Result (List⁺ VariableBinding)
-mkNetworkOutputs₁ varsᵢ os = List⁺.foldl addOutputVarₙ addOutputVar₁ os
-  where
-    addOutputVar₁ : 𝐁.OutputDefinition → Result (List⁺ VariableBinding)
-    addOutputVar₁ o with outputVars o
-    ... | varName with isVariableNameInVariableBinding varName varsᵢ -- checking if variable name is in the input vars
-    ... | true = error ""
-    ... | false = success (List⁺.[ toVariableBindingₒ o ])
-    
-    addOutputVarₙ : Result (List⁺ VariableBinding) → 𝐁.OutputDefinition → Result (List⁺ VariableBinding)
-    addOutputVarₙ (error _) _ = error ""
-    addOutputVarₙ (success n) o with outputVars o
-    ... | varName with isVariableNameInVariableBinding varName varsᵢ -- checking if variable name is in the input vars
-    ... | true = error ""
-    ... | false with isVariableNameInVariableBinding varName n -- checking for the repeated name in the iteratively built outputVars list
-    ... | true = error ""
-    ... | false = success(toVariableBindingₒ o ∷⁺ n)
-
-mkNetworkOutputsₙ : CheckContext → List⁺ VariableBinding → List⁺ 𝐁.OutputDefinition → Result (List⁺ VariableBinding)
-mkNetworkOutputsₙ Γ varsᵢ os = List⁺.foldl addOutputVarₙ addOutputVar₁ os
-  where
-    addOutputVar₁ : 𝐁.OutputDefinition → Result (List⁺ VariableBinding)
-    addOutputVar₁ o with outputVars o
-    ... | varName with isVariableNameUnique varName Γ (toList varsᵢ) -- checking if variable name is in the input vars
-    ... | false = error ""
-    ... | true = success (List⁺.[ toVariableBindingₒ o ])
-    
-    addOutputVarₙ : Result (List⁺ VariableBinding) → 𝐁.OutputDefinition → Result (List⁺ VariableBinding)
-    addOutputVarₙ (error _) _ = error ""
-    addOutputVarₙ (success n) o with outputVars o
-    ... | varName with isVariableNameUnique varName Γ (toList varsᵢ) -- checking if variable name is in the input vars
-    ... | false = error ""
-    ... | true with isVariableNameUnique varName Γ (toList n) -- checking for the repeated name in the iteratively built outputVars list
-    ... | false = error ""
-    ... | true = success(toVariableBindingₒ o ∷⁺ n)
-
------------ Add networks to context -----------
-mkNetworkContext₁ : List⁺ 𝐁.InputDefinition → List⁺ 𝐁.OutputDefinition → Result (NetworkBinding)
-mkNetworkContext₁ is os with mkNetworkInputs₁ is  -- add input definitions to variable definition
-... | error _ = error ""
-... | success varsᵢ with mkNetworkOutputs₁ varsᵢ os -- add output definitions
-... | error _ = error ""
-... | success varsₒ = success (networkBinding varsᵢ varsₒ)
-
-mkNetworkContextₙ : CheckContext → List⁺ 𝐁.InputDefinition → List⁺ 𝐁.OutputDefinition → Result (NetworkBinding)
-mkNetworkContextₙ Γ is os with mkNetworkInputsₙ Γ is    -- add input definitions to variable definition
-... | error _ = error ""
-... | success varsᵢ with mkNetworkOutputsₙ Γ varsᵢ os -- add output definitions
-... | error _ = error ""
-... | success varsₒ = success (networkBinding varsᵢ varsₒ)
+mkNetworkContextₙ : CheckContext → List 𝐕.InputDefinition → List 𝐕.OutputDefinition → Result (NetworkBinding)
+mkNetworkContextₙ Γ is os = do
+  is' ← mkNetworkInputs Γ is
+  os' ← mkNetworkOutputs Γ is' os
+  return (networkBinding is' os')
 
 ------------ Create the Check context -----------
 mkCheckContext : List 𝐁.NetworkDefinition → Result CheckContext
-mkCheckContext networkDefs = List.foldl networkₙ (success []) networkDefs
+mkCheckContext networkDefs with convertNetworkDefs networkDefs
+... | error x = error x
+... | success ns = List.foldl networkₙ (success []) ns
   where
-    networkₙ : Result CheckContext → 𝐁.NetworkDefinition → Result CheckContext
-    networkₙ (error _) netDef = error ""
-    networkₙ (success Γ) netDef with convertListToList⁺ (getInputDefs netDef)
-    ... | error _ = error ""
-    ... | success is with convertListToList⁺ (getOutputDefs netDef)
-    ... | error _ = error ""
-    ... | success os with mkNetworkContextₙ Γ is os
-    ... | error _ = error ""
-    ... | success x = success ( (x , convertNetworkBindingToDef (convertVariableName (getNetworkName netDef)) x) ∷ Γ)
-
+    networkₙ : Result CheckContext → 𝐕.NetworkDefinition → Result CheckContext
+    networkₙ (error x) n = error x
+    networkₙ (success Γ) n = do
+      n' ← mkNetworkContextₙ Γ (getInputDefsᵥ n) (getOutputDefsᵥ n)
+      return ((n' , n) ∷ Γ)
