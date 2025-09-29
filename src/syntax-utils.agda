@@ -6,6 +6,7 @@ open import Data.String as String hiding (toList)
 open import Syntax.AST as 𝐁 hiding (String)
 open import vnnlib-syntax as 𝐕
 open import Data.Nat as ℕ
+open import Data.Bool
 open import Data.Integer as ℤ using (∣_∣)
 open import vnnlib-types as 𝐄
 open import Data.Maybe using (Maybe)
@@ -88,21 +89,40 @@ convertOutputDefinition (outputOnnxDef x₁ e t x₂) = do
   t' ←  (convertTensorShape t)
   return (declareOutput (SVariableName ⟦ x₁ ⟧asString) (convertElementType e) t')
 
-iList : 𝐁.InputDefinition → Result (List 𝐕.InputDefinition) → Result (List 𝐕.InputDefinition)
-iList a is = do
-  a' ← convertInputDefinition a
-  return (a' ∷ {!is!})
-      
+appendInputs : Result (List 𝐕.InputDefinition) →  𝐁.InputDefinition → Result (List 𝐕.InputDefinition)
+appendInputs is i = do
+  i' ← convertInputDefinition i
+  is' ← is
+  return (i' ∷ is')
+
+appendOutputs : Result (List 𝐕.OutputDefinition) → 𝐁.OutputDefinition → Result (List 𝐕.OutputDefinition)
+appendOutputs os o = do
+  o' ← convertOutputDefinition o
+  os' ← os
+  return (o' ∷ os')
+
 convertNetworkDefinition : 𝐁.NetworkDefinition → Result (𝐕.NetworkDefinition)
-convertNetworkDefinition (networkDef x is _ os) = do
-  is' ← List.foldl (λ z z₁ → {!!}) (success []) is
-  os' ← List.foldl {!!} {!!} os
+convertNetworkDefinition (networkDef x _ is _ os) = do
+  is' ← List.foldl appendInputs (success []) is
+  os' ← List.foldl appendOutputs (success []) os
   return (declareNetwork (convertVariableName x) is' os')
+
+appendNetworks : Result (List 𝐕.NetworkDefinition) → 𝐁.NetworkDefinition → Result (List 𝐕.NetworkDefinition)
+appendNetworks ns n = do
+  n' ← convertNetworkDefinition n
+  ns' ← ns
+  return ( n' ∷ ns' )
 
 convertNetworkDefs : List⁺ 𝐁.NetworkDefinition → Result (List 𝐕.NetworkDefinition)
 convertNetworkDefs networkDefs = do
-  ns' ← List.foldl {!!} (success []) (toList networkDefs)
+  ns' ← List.foldl appendNetworks (success []) (toList networkDefs)
   return ns'
+
+inclNetworkDefsCompStm : 𝐁.NetworkDefinition → Bool
+inclNetworkDefsCompStm (networkDef _ cs _ _ _) = 1 ≤ᵇ List.length cs
+
+inclNetworkDefsHiddenDefs : 𝐁.NetworkDefinition → Bool
+inclNetworkDefsHiddenDefs (networkDef _ _ _ hs _) = 1 ≤ᵇ List.length hs
 
 -- Get variable Names
 inputVars : 𝐁.InputDefinition → 𝐁.VariableName
@@ -116,12 +136,15 @@ outputVars : 𝐁.OutputDefinition → 𝐁.VariableName
 outputVars (outputDef x e t) = x
 outputVars (outputOnnxDef x₁ e t x₂) = x₁
 
+getCompStms : 𝐁.NetworkDefinition → List 𝐁.CompStm
+getCompStms (networkDef _ cs _ _ _) = cs
+
 getInputDefs : 𝐁.NetworkDefinition → List 𝐁.InputDefinition
-getInputDefs (networkDef _ is _ _) = is
+getInputDefs (networkDef _ _ is _ _) = is
 
 getOutputDefs : 𝐁.NetworkDefinition → List 𝐁.OutputDefinition
-getOutputDefs (networkDef _ _ _ os) = os
+getOutputDefs (networkDef _ _ _ _ os) = os
 
 getNetworkName : 𝐁.NetworkDefinition → 𝐁.VariableName
-getNetworkName (networkDef x _ _ _) = x
+getNetworkName (networkDef x _ _ _ _) = x
     
