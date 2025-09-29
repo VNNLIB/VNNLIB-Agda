@@ -7,7 +7,8 @@ This repository includes the following for Agda formalisation for the [VNN-LIB s
 
 ## Additional Software Requirements
 - [Agda Standard Library](https://github.com/agda/agda-stdlib): utilized in the Agda formalization
-- (Contributing)[BNFC Parser](https://hackage.haskell.org/package/BNFC): this is to generate the AST using the Agda backened from the syntax file.
+- [VNNLIB-Standard](https://github.com/VNNLIB/VNNLIB-Standard) syntax: this is added as a submodule to this project.
+- [BNFC Parser](https://hackage.haskell.org/package/BNFC): this is to generate the AST using the Agda backened from the syntax file.
 
 ## Generate the BNFC Agda parser
 ```bash
