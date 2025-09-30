@@ -24,9 +24,9 @@ open import Function
 open import Syntax.AST as 𝐁 hiding (String)
 open import vnnlib-types as 𝐄
 open import syntax-utils
-open import types-utils
+open import utils
 open import tensor as 𝐓
-open import context-isomorphism
+open import vnnlib-context-isomorphism
 
 open import Level
 open import Data.Sum.Effectful.Left String 0ℓ renaming (Sumₗ to Result)

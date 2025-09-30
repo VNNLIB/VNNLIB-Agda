@@ -7,10 +7,9 @@ open import Syntax.AST as 𝐁 hiding (String)
 
 open import vnnlib-syntax as 𝐕
 open import syntax-utils
-open import types-utils
+open import utils
 open import vnnlib-check-declarations
 open import vnnlib-check-assertions
-open import context-isomorphism
 
 open import Level
 open import Data.Sum.Effectful.Left String 0ℓ renaming (Sumₗ to Result)

@@ -11,7 +11,7 @@ open import Data.Maybe using (Maybe)
 open import Syntax.AST as 𝐁 hiding (String)
 open import vnnlib-syntax as 𝐕
 open import vnnlib-types as 𝐄
-open import types-utils
+open import utils
 open import tensor as 𝐓
 
 -- convert the BNFC VariableName to agda string type

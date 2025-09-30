@@ -16,7 +16,7 @@ open import Data.Nat.Show
 
 open import tensor as 𝐓 using (TensorShape)
 open import syntax-utils
-open import types-utils
+open import utils
 open import vnnlib-types as 𝐄
 
 open import Level

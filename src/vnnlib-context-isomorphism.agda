@@ -1,4 +1,4 @@
-module context-isomorphism where
+module vnnlib-context-isomorphism where
 
 open import Data.Nat as ℕ
 open import Data.List as List
