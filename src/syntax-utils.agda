@@ -77,14 +77,8 @@ getCompStmName (equalTo x) = x
 getInputDefsᵇ : 𝐁.NetworkDefinition → List 𝐁.InputDefinition
 getInputDefsᵇ (networkDef _ _ is _ _) = is
 
-getInputDefs : 𝐕.NetworkDefinition → List 𝐕.InputDefinition
-getInputDefs (declareNetwork _ is _) = is
-
 getOutputDefsᵇ : 𝐁.NetworkDefinition → List 𝐁.OutputDefinition
 getOutputDefsᵇ (networkDef _ _ _ _ os) = os
-
-getOutputDefs : 𝐕.NetworkDefinition → List 𝐕.OutputDefinition
-getOutputDefs (declareNetwork _ _ os) = os
 
 getNetworkNameᵇ : 𝐁.NetworkDefinition → 𝐁.VariableName
 getNetworkNameᵇ (networkDef x _ _ _ _) = x
