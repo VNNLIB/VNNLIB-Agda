@@ -19,6 +19,7 @@ open import Relation.Binary.PropositionalEquality as Eq using (_≡_; refl; sym;
 open Eq.≡-Reasoning
 open import Relation.Nullary
 open import Data.Maybe hiding (_>>=_)
+open import Data.Nat.Show
 open import Function
 
 open import Syntax.AST as 𝐁 hiding (String)
@@ -38,7 +39,15 @@ open NetworkType
 Γ : Context
 Γ = mkContext Σ
 
-postulate validIndices : List 𝐁.Number → (s : 𝐓.TensorShape) → Result (𝐓.TensorIndices s)
+validIndices : List 𝐁.Number → (s : 𝐓.TensorShape) → Result (𝐓.TensorIndices s)
+validIndices [] [] = success 𝐓.empty
+validIndices [] (x ∷ s) = error "Not enough indices for tensor shape"
+validIndices (x ∷ xs) [] = error "Too many indices for tensor shape"
+validIndices (x ∷ xs) (n ∷ s) = do
+  n' ← convertMaybeToResult (readMaybe 10 ⟦ x ⟧asStringₙ)
+  idx ← convertMaybeToResult (toFin n n')
+  rest ← validIndices xs s
+  return (non-empty idx rest)
 
 mutual
     inferArithExprType : 𝐁.ArithExpr → Maybe 𝐄.ElementType
@@ -73,7 +82,7 @@ mutual
     checkArithExpr τ (varExpr x xs) with getNetworkIndex Σ (convertVariableName x)
     ... | error e = error e
     ... | success n with getInputIndex (convertVariableName x) (getInputDefs (List.lookup Σ n))
-    ...   | success i = if isSameType τ (getElementTypeᵢ inputDecl) then success (varInput networkInd inputInd {!!}) else error "Variable type mismatch"
+    ... | success i = if isSameType τ (getElementTypeᵢ inputDecl) then success (varInput networkInd inputInd {!!}) else error "Variable type mismatch"
         where
           inputDecl : 𝐕.InputDefinition
           inputDecl = List.lookup (getInputDefs (List.lookup Σ n)) i

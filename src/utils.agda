@@ -41,3 +41,13 @@ convertListToList⁺ lst = do
   let convertedList = fromList lst
   res ← convertMaybeToResult (convertedList)
   return res
+
+open import Data.Nat using (ℕ; _<_; _≤_; _<?_)
+open import Data.Fin using (Fin; fromℕ<)
+open import Data.Maybe using (Maybe; just; nothing)
+open import Relation.Nullary
+
+toFin : (n m : ℕ) → Maybe (Fin n)
+toFin n m with m <? n
+... | yes p = just (fromℕ< p)
+... | no _  = nothing
