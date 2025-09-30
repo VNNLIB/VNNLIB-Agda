@@ -1,8 +1,7 @@
 module vnnlib-check where
 
-open import Data.Product as Product using (proj₂)
 open import Data.String as String using (String)
-open import Data.List as List hiding (foldl)
+open import Data.List as List
 open import Data.List.NonEmpty as List⁺
 open import Syntax.AST as 𝐁 hiding (String)
 
@@ -20,34 +19,30 @@ open import Effect.Monad
 
 open RawMonad monad
 
-scopeCheckAssertions : (Σ : CheckContext) → List⁺ 𝐁.Assertion → Result (List (𝐕.Assertion (convertΣtoΓ Σ)))
-scopeCheckAssertions Σ asserts = List⁺.foldl checkAssertₙ checkAssert asserts
+checkAssertions : (Σ : List 𝐕.NetworkDefinition) → List 𝐁.Assertion → Result (List (𝐕.Assertion (mkContext Σ)))
+checkAssertions Σ asserts = List.foldl checkAsserts (success []) asserts
   where
-    checkAssert : 𝐁.Assertion → Result (List (𝐕.Assertion (convertΣtoΓ Σ)))
-    checkAssert (assert b) with checkBoolExpr Σ b
-    ... | error _ = error ""
-    ... | success x = success (List.[ assert x ])
-    checkAssertₙ : Result (List (𝐕.Assertion (convertΣtoΓ Σ))) → 𝐁.Assertion → Result (List (𝐕.Assertion (convertΣtoΓ Σ)))
-    checkAssertₙ (error _) _ = error ""
-    checkAssertₙ (success props) a with checkAssert a
-    ... | error _ = error ""
-    ... | success x = success (x ++ props)
+    checkAssert : 𝐁.Assertion → Result (𝐕.Assertion (mkContext Σ))
+    checkAssert (assert b) = do
+      b' ← checkBoolExpr Σ b
+      return (assert b')
 
--- Check Assertions from the constructed Scope Context
-checkAssertions : List 𝐁.NetworkDefinition → List⁺ 𝐁.Assertion → Result 𝐕.Query
-checkAssertions defs asserts with mkCheckContext defs
-... | error _ = error ""
-... | success Σ with scopeCheckAssertions Σ asserts
-... | error _ = error ""
-... | success x = success (𝐕.mkQuery checkedNetworkDefs x) -- mkCheckContext should return the networkdefs
-  where
-    checkedNetworkDefs : List 𝐕.NetworkDefinition
-    checkedNetworkDefs = List.map proj₂ Σ
+    checkAsserts : Result (List (𝐕.Assertion (mkContext Σ))) → 𝐁.Assertion → Result (List (𝐕.Assertion (mkContext Σ)))
+    checkAsserts (error e) _ = error e
+    checkAsserts (success asserts) a = do
+      a' ← checkAssert a
+      return (a' ∷ asserts)
+    
+-- Check a VNN-LIB query
+checkQuery : List 𝐁.NetworkDefinition → List 𝐁.Assertion → Result 𝐕.Query
+checkQuery defs asserts = do
+  defs' ← mkCheckContext defs
+  asserts' ← checkAssertions defs' asserts
+  return (𝐕.mkQuery defs' asserts')
 
--- change to non-empty list
-scopeCheck : 𝐁.Query → Result 𝐕.Query
-scopeCheck (vNNLibQuery ver ns as) = asserts⁺ (convertListToList⁺ as)
-  where
-    asserts⁺ : Result (List⁺ 𝐁.Assertion) → Result 𝐕.Query
-    asserts⁺ (error _) = error "Cannot have no assertions"
-    asserts⁺ (success x₁) = checkAssertions ns x₁
+-- Parser Entrypoint
+check : 𝐁.Query → Result 𝐕.Query
+check (vNNLibQuery ver ns as) = do
+  assertions ← (convertListToList⁺ as) -- cannot have non-empty list of assertions
+  query ← checkQuery ns (toList assertions)
+  return query

@@ -1,6 +1,8 @@
 {-# OPTIONS --allow-unsolved-metas #-}
+open import vnnlib-syntax as 𝐕
+open import Data.List as List
 open import vnnlib-check-declarations
-module vnnlib-check-assertions (Σ : CheckContext) where
+module vnnlib-check-assertions (Σ : List 𝐕.NetworkDefinition) where
 
 open import Data.Nat as ℕ
 open import Data.Product as Product using (proj₁; proj₂; _,_)
@@ -9,7 +11,6 @@ open import Data.Integer as ℤ using (∣_∣)
 open import Data.String as String using (String; _==_)
 open import Data.String.Properties
 open import Data.Fin as Fin
-open import Data.List as List hiding (lookup; foldl)
 open import Data.List.NonEmpty as List⁺
 open import Data.List.Relation.Unary.Any as RUAny
 open import Data.List.Properties using (length-map)
@@ -21,7 +22,6 @@ open import Data.Maybe hiding (_>>=_)
 open import Function
 
 open import Syntax.AST as 𝐁 hiding (String)
-open import vnnlib-syntax as 𝐕
 open import vnnlib-types as 𝐄
 open import syntax-utils
 open import types-utils
@@ -33,27 +33,24 @@ open import Data.Sum.Effectful.Left String 0ℓ renaming (Sumₗ to Result)
 open import Data.Sum.Base renaming (inj₁ to error; inj₂ to success)
 open import Effect.Monad
 open RawMonad monad
-
+open NetworkType
 
 Γ : Context
-Γ = convertΣtoΓ Σ
+Γ = mkContext Σ
 
-isTypedVariable : 𝐄.ElementType → VariableBinding → Bool
-isTypedVariable τ v with τ 𝐄.≟ getElementType v
-... | yes p = true
-... | no _ = false
-
-postulate validIndices : List 𝐁.Number → (s : 𝐓.TensorShape) → Result (𝐓.TensorIndices s) -- Data.Nat.Show readMaybe
+postulate validIndices : List 𝐁.Number → (s : 𝐓.TensorShape) → Result (𝐓.TensorIndices s)
 
 mutual
     inferArithExprType : 𝐁.ArithExpr → Maybe 𝐄.ElementType
-    inferArithExprType (varExpr x xs) with variableNetworkIndex x Σ
+    inferArithExprType (varExpr x xs) with getNetworkIndex Σ (convertVariableName x)
     ... | error _ = nothing
-    ... | success n with variableIndexInNetworkᵢₙₚᵤₜ (proj₁ (List.lookup Σ n)) x
-    ... | success i = just (getElementType (List.lookup (toList (NetworkBinding.inputs (proj₁ (List.lookup Σ n)))) i))
-    ... | error _ with variableIndexInNetworkₒᵤₜₚᵤₜ (proj₁ (List.lookup Σ n)) x
-    ... | success j = just (getElementType (List.lookup (toList (NetworkBinding.outputs (proj₁ (List.lookup Σ n)))) j))
-    ... | error _ = nothing -- out-of-scope
+    ... | success n with getInputIndex (convertVariableName x) inputDefs | getOutputIndex (convertVariableName x) outputDefs
+      where
+       inputDefs = getInputDefs (List.lookup Σ n)
+       outputDefs = getOutputDefs (List.lookup Σ n)
+    ... | error x₁ | error x₂ = nothing -- out-of-scope (should be unreachable)
+    ... | error x₁ | success y = just (getElementTypeₒ (List.lookup (getOutputDefs (List.lookup Σ n)) y))
+    ... | success y | _ = just (getElementTypeᵢ (List.lookup (getInputDefs (List.lookup Σ n)) y))
     inferArithExprType (valExpr x) = nothing
     inferArithExprType (negate a) = inferArithExprType a
     inferArithExprType (plus as) = inferListArithExprType as
@@ -73,33 +70,39 @@ mutual
     checkArithExpr τ (valExpr x) with parseNumber τ x
     ... | just t = success (constant t)
     ... | nothing = error "Cannot parse number"
-    checkArithExpr τ (varExpr x xs) with variableNetworkIndex x Σ
-    ... | error _ = error ""
-    ... | success n with variableIndexInNetworkᵢₙₚᵤₜ (proj₁ (List.lookup Σ n)) x
-    ...   | success i = if isTypedVariable τ varBinding then success (varInput networkInd inputInd {!!}) else error "Variable type mis-match"
+    checkArithExpr τ (varExpr x xs) with getNetworkIndex Σ (convertVariableName x)
+    ... | error e = error e
+    ... | success n with getInputIndex (convertVariableName x) (getInputDefs (List.lookup Σ n))
+    ...   | success i = if isSameType τ (getElementTypeᵢ inputDecl) then success (varInput networkInd inputInd {!!}) else error "Variable type mismatch"
         where
-        varBinding : VariableBinding
-        varBinding = List.lookup (toList (NetworkBinding.inputs (proj₁ (List.lookup Σ n)))) i
+          inputDecl : 𝐕.InputDefinition
+          inputDecl = List.lookup (getInputDefs (List.lookup Σ n)) i
         
-        networkInd : Fin (List.length (Γ))
-        networkInd = subst Fin (length-CheckContext-Context Σ) n      
+          networkInd : Fin (List.length Γ)
+          networkInd = cast (length-Context Σ) n
 
-        inputInd : Fin (List.length (NetworkType.inputShape (List.lookup Γ (subst Fin (length-CheckContext-Context Σ) n))))
-        inputInd = subst Fin (length-inputs Σ n) i
-    ... | error _ with variableIndexInNetworkₒᵤₜₚᵤₜ (proj₁ (List.lookup Σ n)) x
+          inputInd : Fin (List.length (inputShapes&Types (List.lookup (mkContext Σ) (cast (length-Context Σ) n))))
+          inputInd = cast (length-inputs Σ n) i
+
+          tensorShape = proj₁ (List.lookup (inputShapes&Types (List.lookup Γ networkInd)) inputInd)
+          indices = validIndices xs tensorShape
+    ... | error _ with getOutputIndex (convertVariableName x) (getOutputDefs (List.lookup Σ n))
     ... | error _ = error ""
-    ... | success o = if isTypedVariable τ varBinding then success (varOutput networkInd outputInd {!!}) else error "Variable type mis-match"
+    ... | success o = if isSameType τ (getElementTypeₒ outputDecl) then success (varOutput networkInd outputInd {!!}) else error "Variable type mismatch"
         where
-        varBinding : VariableBinding
-        varBinding = List.lookup (toList (NetworkBinding.outputs (proj₁ (List.lookup Σ n)))) o
+          outputDecl : 𝐕.OutputDefinition
+          outputDecl = List.lookup (getOutputDefs (List.lookup Σ n)) o
         
-        networkInd : Fin (List.length (Γ))
-        networkInd = subst Fin (length-CheckContext-Context Σ) n
-        
-        outputInd : Fin (List.length (NetworkType.outputShape (List.lookup Γ (subst Fin (length-CheckContext-Context Σ) n))))
-        outputInd = subst Fin (length-outputs Σ n) o
+          networkInd : Fin (List.length Γ)
+          networkInd = cast (length-Context Σ) n
+
+          outputInd : Fin (List.length (outputShapes&Types (List.lookup (mkContext Σ) (cast (length-Context Σ) n))))
+          outputInd = cast (length-outputs Σ n) o
+
+          tensorShape = proj₁ (List.lookup (outputShapes&Types (List.lookup Γ networkInd)) outputInd)
+          indices = validIndices xs tensorShape
     checkArithExpr τ (negate a) with checkArithExpr τ a
-    ... | error _ = error "Type error in negated expression"
+    ... | error e = error e
     ... | success x = success (negate x)
     checkArithExpr τ (plus as) = do
         as' ← checkListArithExpr τ as
