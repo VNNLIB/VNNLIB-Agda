@@ -1,4 +1,3 @@
-{-# OPTIONS --allow-unsolved-metas #-}
 open import vnnlib-syntax as 𝐕
 open import Data.List as List
 open import vnnlib-check-declarations
@@ -57,7 +56,7 @@ mutual
       where
        inputDefs = getInputDefs (List.lookup Σ n)
        outputDefs = getOutputDefs (List.lookup Σ n)
-    ... | error x₁ | error x₂ = nothing -- out-of-scope (should be unreachable)
+    ... | error x₁ | error x₂ = nothing -- out-of-scope (should be unreachable with checked declarations)
     ... | error x₁ | success y = just (getElementTypeₒ (List.lookup (getOutputDefs (List.lookup Σ n)) y))
     ... | success y | _ = just (getElementTypeᵢ (List.lookup (getInputDefs (List.lookup Σ n)) y))
     inferArithExprType (valExpr x) = nothing
@@ -81,35 +80,20 @@ mutual
     ... | nothing = error "Cannot parse number"
     checkArithExpr τ (varExpr x xs) with getNetworkIndex Σ (convertVariableName x)
     ... | error e = error e
-    ... | success n with getInputIndex (convertVariableName x) (getInputDefs (List.lookup Σ n))
-    ... | success i = if isSameType τ (getElementTypeᵢ inputDecl) then success (varInput networkInd inputInd {!!}) else error "Variable type mismatch"
-        where
-          inputDecl : 𝐕.InputDefinition
-          inputDecl = List.lookup (getInputDefs (List.lookup Σ n)) i
-        
-          networkInd : Fin (List.length Γ)
-          networkInd = cast (length-Context Σ) n
-
-          inputInd : Fin (List.length (inputShapes&Types (List.lookup (mkContext Σ) (cast (length-Context Σ) n))))
-          inputInd = cast (length-inputs Σ n) i
-
-          tensorShape = proj₁ (List.lookup (inputShapes&Types (List.lookup Γ networkInd)) inputInd)
-          indices = validIndices xs tensorShape
-    ... | error _ with getOutputIndex (convertVariableName x) (getOutputDefs (List.lookup Σ n))
-    ... | error _ = error ""
-    ... | success o = if isSameType τ (getElementTypeₒ outputDecl) then success (varOutput networkInd outputInd {!!}) else error "Variable type mismatch"
-        where
-          outputDecl : 𝐕.OutputDefinition
-          outputDecl = List.lookup (getOutputDefs (List.lookup Σ n)) o
-        
-          networkInd : Fin (List.length Γ)
-          networkInd = cast (length-Context Σ) n
-
-          outputInd : Fin (List.length (outputShapes&Types (List.lookup (mkContext Σ) (cast (length-Context Σ) n))))
-          outputInd = cast (length-outputs Σ n) o
-
-          tensorShape = proj₁ (List.lookup (outputShapes&Types (List.lookup Γ networkInd)) outputInd)
-          indices = validIndices xs tensorShape
+    ... | success n with getInputIndex (convertVariableName x) (getInputDefs (List.lookup Σ n)) | getOutputIndex (convertVariableName x) (getOutputDefs (List.lookup Σ n))
+    ... | error x₁ | error x₂ = error x₁
+    ... | error x₁ | success o = do
+        let networkInd = cast (length-Context Σ) n
+        let outputInd = cast (length-outputs Σ n) o
+        let outputDecl = List.lookup (getOutputDefs (List.lookup Σ n)) o        
+        indicesₒ ← validIndices xs (proj₁ (List.lookup (outputShapes&Types (List.lookup Γ networkInd)) outputInd))
+        if isSameType τ (getElementTypeₒ outputDecl) then success (varOutput networkInd outputInd indicesₒ) else error "Variable type mismatch"
+    ... | success i | _ = do
+        let networkInd = cast (length-Context Σ) n
+        let inputInd = cast (length-inputs Σ n) i
+        let inputDecl = List.lookup (getInputDefs (List.lookup Σ n)) i        
+        indicesₒ ← validIndices xs (proj₁ (List.lookup (inputShapes&Types (List.lookup Γ networkInd)) inputInd))
+        if isSameType τ (getElementTypeᵢ inputDecl) then success (varInput networkInd inputInd indicesₒ) else error "Variable type mismatch"
     checkArithExpr τ (negate a) with checkArithExpr τ a
     ... | error e = error e
     ... | success x = success (negate x)
