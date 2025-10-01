@@ -1,6 +1,5 @@
 src/MAlonzo/**
 _build/**
 src/Syntax/**
-Makefile
 Main
 !src/Syntax/Main.agda
