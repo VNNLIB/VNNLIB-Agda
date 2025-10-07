@@ -23,10 +23,6 @@ data ElementType : Set where
   uint16       : ElementType
   uint32       : ElementType
   uint64       : ElementType
-  complex64    : ElementType
-  complex128   : ElementType
-  boolType     : ElementType
-  stringType   : ElementType
 
 -- Add semantics for each type
 ElementTypeToSet : ElementType → Set
@@ -51,8 +47,4 @@ isSameType uint8 uint8 = true
 isSameType uint16 uint16 = true
 isSameType uint32 uint32 = true
 isSameType uint64 uint64 = true
-isSameType complex64 complex64 = true
-isSameType complex128 complex128 = true
-isSameType boolType boolType = true
-isSameType stringType stringType = true
 isSameType _ _ = false
