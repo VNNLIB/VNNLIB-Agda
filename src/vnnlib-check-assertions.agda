@@ -41,7 +41,11 @@ open NetworkType
 validIndices : List 𝐁.Number → (s : 𝐓.TensorShape) → Result (𝐓.TensorIndices s)
 validIndices [] [] = success 𝐓.empty
 validIndices [] (x ∷ s) = error "Not enough indices for tensor shape"
-validIndices (x ∷ xs) [] = error "Too many indices for tensor shape"
+validIndices (x ∷ xs) [] with x | xs -- for tensors declared with no shape i.e. scalars
+... | number x₁ | [] = do
+  x₁' ← convertMaybeToResult (readMaybe 10 ⟦ number x₁ ⟧asStringₙ)
+  if x₁' ≡ᵇ ℕ.zero then success 𝐓.empty else error "Too many indices for tensor shape"
+... | number x₁ | x₂ ∷ b = error "Too many indices for tensor shape"
 validIndices (x ∷ xs) (n ∷ s) = do
   n' ← convertMaybeToResult (readMaybe 10 ⟦ x ⟧asStringₙ)
   idx ← convertMaybeToResult (toFin n n')
