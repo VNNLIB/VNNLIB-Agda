@@ -2,6 +2,7 @@ module vnnlib-types where
 
 open import Data.Rational as ℚ
 open import Data.Bool
+open import Agda.Builtin.Float using (Float)
 
 -- -- Element Types
 data ElementType : Set where
@@ -24,9 +25,14 @@ data ElementType : Set where
   uint32       : ElementType
   uint64       : ElementType
 
+-- placeholder
+postulate elementTypeToSet : ElementType → Set
+
 -- Add semantics for each type
 ElementTypeToSet : ElementType → Set
-ElementTypeToSet e = ℚ
+ElementTypeToSet real = ℚ
+ElementTypeToSet float64 = Float
+ElementTypeToSet e = elementTypeToSet e
 
 isSameType : ElementType → ElementType → Bool
 isSameType real real = true
