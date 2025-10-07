@@ -28,8 +28,8 @@ all : Syntax/Test Main
 Syntax/Test : Syntax/Abs.hs Syntax/Lex.hs Syntax/Par.hs Syntax/Print.hs Syntax/Test.hs
 	${GHC} ${GHC_OPTS} $@
 
-Main : Syntax/Main.agda Syntax/AST.agda Syntax/Parser.agda Syntax/IOLib.agda Syntax/ErrM.hs Syntax/Lex.hs Syntax/Par.hs Syntax/Print.hs
-	${AGDA} --no-libraries --ghc --ghc-flag=-Wwarn $<
+Main : main.agda Syntax/AST.agda Syntax/Parser.agda Syntax/IOLib.agda Syntax/ErrM.hs Syntax/Lex.hs Syntax/Par.hs Syntax/Print.hs
+	${AGDA} --ghc --ghc-flag=-Wwarn $<
 
 # Rules for cleaning generated files.
 
