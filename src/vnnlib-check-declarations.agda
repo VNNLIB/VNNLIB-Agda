@@ -151,7 +151,7 @@ mkNetworkDefinition ns n with convertListToList⁺ (getHiddenDefsᵇ n)
       return (declareNetwork (convertVariableName (getNetworkNameᵇ n)) is' os')
 
 isDefinedNetworkName : List 𝐕.NetworkDefinition → Result 𝐁.CompStm → Bool
-isDefinedNetworkName ns (error _) = false
+isDefinedNetworkName ns (error _) = true
 isDefinedNetworkName ns (success x) with any? (λ n → ⟦ getCompStmName x ⟧asString String.≟ ⟦ getNetworkName n ⟧asStringᵥ) ns
 ... | no ¬p = false
 ... | yes p = true
