@@ -13,6 +13,7 @@ open import Syntax.AST as 𝐁 hiding (String)
 open import Data.List.Relation.Unary.Any as RUAny
 open import Relation.Nullary
 open import Data.Nat.Show
+open import Data.Maybe using (Maybe;just;nothing)
 
 open import tensor as 𝐓 using (TensorShape)
 open import syntax-utils
@@ -139,8 +140,6 @@ mkNetworkOutputs Γ defsᵢ os = List.foldl addOutputVar (success []) os
 mkNetworkDefinition : List 𝐕.NetworkDefinition → 𝐁.NetworkDefinition → Result (𝐕.NetworkDefinition)
 mkNetworkDefinition ns n with convertListToList⁺ (getHiddenDefsᵇ n)
 ... | success _ = error "Hidden Definitions not supported"
-... | error _ with convertMaybeToResult (getCompStms n)
-... | success _ = error "Congruence Statements not supported"
 ... | error _ with convertListToList⁺ (getInputDefsᵇ n) | convertListToList⁺ (getOutputDefsᵇ n)
 ... | error _ | error _ = error "Network Definitions must have inputs and outputs"
 ... | error _ | success y = error "Network Definitions must have inputs"
@@ -150,22 +149,24 @@ mkNetworkDefinition ns n with convertListToList⁺ (getHiddenDefsᵇ n)
       os' ← mkNetworkOutputs ns is' (toList os)
       return (declareNetwork (convertVariableName (getNetworkNameᵇ n)) is' os')
 
-isDefinedNetworkName : List 𝐕.NetworkDefinition → Result 𝐁.CompStm → Bool
-isDefinedNetworkName ns (error _) = true
-isDefinedNetworkName ns (success x) with any? (λ n → ⟦ getCompStmName x ⟧asString String.≟ ⟦ getNetworkName n ⟧asStringᵥ) ns
-... | no ¬p = false
-... | yes p = true
+-- Returns the index of the network Definition that the congruence statement points to
+refOfCompStm : (ns : List 𝐕.NetworkDefinition) → List 𝐁.CompStm → Maybe (Result (Fin (List.length ns)))
+refOfCompStm ns [] = nothing
+refOfCompStm ns (c ∷ tail₁) with tail₁
+... | x ∷ a = just (error "There can only be 1 congruence statement per network declaration")
+... | [] with any? (λ n → ⟦ getCompStmName c ⟧asString String.≟ ⟦ getNetworkName n ⟧asStringᵥ) ns
+... | no ¬p = just (error "Congruence Statements must refer to defined networks")
+... | yes p = just (success (index p))
 
 parseNetworkDef : Result (List 𝐕.NetworkDefinition) → 𝐁.NetworkDefinition → Result (List 𝐕.NetworkDefinition)
 parseNetworkDef (error x) n = error x
 parseNetworkDef (success ns) n with any? (λ x → ⟦ getNetworkNameᵇ n ⟧asString String.≟ ⟦ getNetworkName x ⟧asStringᵥ) ns
 ... | yes p = error "Networks cannot have duplicate names"
-... | no ¬p with isDefinedNetworkName ns (convertMaybeToResult (getCompStms n))
-... | false = error "Congruence Statements cannot refer to undefined networks"
-... | true = do
+... | no ¬p with refOfCompStm ns (getCompStms n)
+... | just csRef = error "Congruence Statements not supported"
+... | nothing = do
         n' ← mkNetworkDefinition ns n
         return ( n' ∷ ns )
-            
 
 ------------ Create the Check context -----------
 mkCheckContext : List 𝐁.NetworkDefinition → Result (List 𝐕.NetworkDefinition)

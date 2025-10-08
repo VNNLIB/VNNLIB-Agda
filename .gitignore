@@ -2,3 +2,4 @@ src/MAlonzo/**
 _build/**
 src/Syntax/**
 Main
+src/Syntax/Main.agda
