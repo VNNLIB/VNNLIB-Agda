@@ -12,5 +12,5 @@ This repository includes the following for Agda formalisation for the [VNN-LIB s
 
 ## Generate the BNFC Agda parser
 ```bash
-bnfc -d -m --agda VNNLIB-Standard/syntax.cf -o src
+bnfc -d --agda VNNLIB-Standard/syntax.cf -o src
 ```
