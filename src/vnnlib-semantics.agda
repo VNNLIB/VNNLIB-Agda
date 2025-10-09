@@ -49,8 +49,8 @@ module _ (Γ : Context) (ε : Environment Γ) where
     ⟦_⟧realₐ : ArithExpr Γ real → ℚ
     ⟦ (constant a) ⟧realₐ        = a
     ⟦ (negate a) ⟧realₐ           = 0ℚ ℚ.- ⟦ a ⟧realₐ
-    ⟦ (varInput iₙₑₜ jᵢₙₚ indices ) ⟧realₐ = tensorLookup indices {!!} -- (((proj₂ ε) iₙₑₜ) jᵢₙₚ)
-    ⟦ (varOutput iₙₑₜ jₒᵤₜ indices ) ⟧realₐ = tensorLookup indices {!!} -- (((((proj₁ ε) iₙₑₜ) (((proj₂ ε) iₙₑₜ))) jₒᵤₜ))
+    ⟦ (varInput iₙₑₜ jᵢₙₚ indices) ⟧realₐ = tensorLookup indices {!(((proj₂ ε) iₙₑₜ) jᵢₙₚ)!} -- (((proj₂ ε) iₙₑₜ) jᵢₙₚ)
+    ⟦ (varOutput iₙₑₜ jₒᵤₜ indices) ⟧realₐ = tensorLookup indices {!!} -- (((((proj₁ ε) iₙₑₜ) (((proj₂ ε) iₙₑₜ))) jₒᵤₜ))
     ⟦ (add []) ⟧realₐ             = 0ℚ
     ⟦ (add (a₀ ∷ a)) ⟧realₐ       = ⟦ a₀ ⟧realₐ ℚ.+ ⟦ (add a) ⟧realₐ
     ⟦ (mult []) ⟧realₐ            = 1ℚ
@@ -69,8 +69,8 @@ module _ (Γ : Context) (ε : Environment Γ) where
     ⟦_⟧float64ₐ : ArithExpr Γ float64 → Float
     ⟦ (constant a) ⟧float64ₐ        = a
     ⟦ (negate a) ⟧float64ₐ           = primFloatMinus 0.0 ⟦ a ⟧float64ₐ
-    ⟦ (varInput iₙₑₜ jᵢₙₚ indices ) ⟧float64ₐ = {!!} -- tensorLookup indices (((proj₂ ε) iₙₑₜ) jᵢₙₚ)
-    ⟦ (varOutput iₙₑₜ jₒᵤₜ indices ) ⟧float64ₐ   = {!!} -- tensorLookup indices (((((proj₁ ε) iₙₑₜ) (((proj₂ ε) iₙₑₜ))) jₒᵤₜ))
+    ⟦ (varInput iₙₑₜ jᵢₙₚ indices ) ⟧float64ₐ = tensorLookup indices {!!} -- tensorLookup indices (((proj₂ ε) iₙₑₜ) jᵢₙₚ)
+    ⟦ (varOutput iₙₑₜ jₒᵤₜ indices ) ⟧float64ₐ = tensorLookup indices {!!} -- tensorLookup indices (((((proj₁ ε) iₙₑₜ) (((proj₂ ε) iₙₑₜ))) jₒᵤₜ))
     ⟦ (add []) ⟧float64ₐ             = 0.0
     ⟦ (add (a₀ ∷ a)) ⟧float64ₐ       = primFloatPlus ⟦ a₀ ⟧float64ₐ ⟦ (add a) ⟧float64ₐ
     ⟦ (mult []) ⟧float64ₐ            = 1.0
