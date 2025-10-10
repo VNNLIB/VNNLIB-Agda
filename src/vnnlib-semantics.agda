@@ -13,44 +13,56 @@ open import Agda.Builtin.Float
 open import utils
 open import vnnlib-types
 open import vnnlib-syntax
-open import tensor using (Tensor; TensorShape; tensorLookup)
+open import tensor
 
-    
--- Network Implementation Representation
-SetOfTensors : List (TensorShape × ElementType) → Set 
-SetOfTensors tensorsInfo =
-  (i : Fin (List.length tensorsInfo)) → let shape&type = List.lookup tensorsInfo i in Tensor (ElementTypeToSet (proj₂ shape&type)) (proj₁ shape&type) 
-
-NetworkImplementation : NetworkType → Set
-NetworkImplementation networkτ = SetOfTensors inputs → SetOfTensors outputs
+private
+  variable
+    τ : ElementType
+    shape : TensorShape
+  
+{-
   where
     inputs = NetworkType.inputShapes&Types networkτ
     outputs = NetworkType.outputShapes&Types networkτ
+-}
 
--- Environment Representation
-Assignments : Context → Set
-Assignments Γ = 
-  (i : Fin (List.length Γ)) → let networkType = List.lookup Γ i in SetOfTensors (NetworkType.inputShapes&Types networkType)
-
-NetworkImplementations : Context → Set
-NetworkImplementations Γ = 
-  (i : Fin (List.length Γ)) → let networkType = List.lookup Γ i in NetworkImplementation networkType
-
-Environment : Context → Set
-Environment Γ = NetworkImplementations Γ × Assignments Γ
 
 -- Semantics of Assertions
-module _ (Γ : Context) (ε : Environment Γ) where
+module _ (Γ : Context) where
 
-  module _ (τ : ElementType) where
-    postulate ⟦_⟧ₐ : ArithExpr Γ τ → ElementTypeToSet τ
-    postulate ⟦_⟧ᶜ : CompExpr Γ τ → Bool
-   
+  -- Network Implementation Representation
+  InputTensor : (i : NetworkRef Γ) → InputRef Γ i τ shape → Set
+  InputTensor  {τ} {shape} i j = Tensor (ElementTypeToSet τ) shape
+
+  InputTensors : (i : NetworkRef Γ) → Set
+  InputTensors i = ∀ {τ} {shape} (j : InputRef Γ i τ shape) → InputTensor i j
+
+  OutputTensor : (i : NetworkRef Γ) → OutputRef Γ i τ shape → Set
+  OutputTensor {τ} {shape} i j = Tensor (ElementTypeToSet τ) shape
+
+  OutputTensors : (i : NetworkRef Γ) → Set
+  OutputTensors i = ∀ {τ} {shape} (j : OutputRef Γ i τ shape) → OutputTensor i j
+
+  Assignments : Set
+  Assignments = (i : NetworkRef Γ) → InputTensors i
+
+  NetworkImplementation : NetworkRef Γ → Set
+  NetworkImplementation i = InputTensors i → OutputTensors i
+
+  NetworkImplementations : Set
+  NetworkImplementations = (i : NetworkRef Γ) → NetworkImplementation i
+
+  Environment : Set
+  Environment = NetworkImplementations × Assignments
+
+  -- Environment Representation
+
+  module _ (ε : Environment) where
     ⟦_⟧realₐ : ArithExpr Γ real → ℚ
     ⟦ (constant a) ⟧realₐ        = a
     ⟦ (negate a) ⟧realₐ           = 0ℚ ℚ.- ⟦ a ⟧realₐ
-    ⟦ (varInput iₙₑₜ jᵢₙₚ indices) ⟧realₐ = tensorLookup indices {!(((proj₂ ε) iₙₑₜ) jᵢₙₚ)!} -- (((proj₂ ε) iₙₑₜ) jᵢₙₚ)
-    ⟦ (varOutput iₙₑₜ jₒᵤₜ indices) ⟧realₐ = tensorLookup indices {!!} -- (((((proj₁ ε) iₙₑₜ) (((proj₂ ε) iₙₑₜ))) jₒᵤₜ))
+    ⟦ (varInput i j indices) ⟧realₐ = tensorLookupET indices (proj₂ ε i j)
+    ⟦ (varOutput i j indices) ⟧realₐ = {!!} --tensorLookupET indices (proj₂ ε i j)
     ⟦ (add []) ⟧realₐ             = 0ℚ
     ⟦ (add (a₀ ∷ a)) ⟧realₐ       = ⟦ a₀ ⟧realₐ ℚ.+ ⟦ (add a) ⟧realₐ
     ⟦ (mult []) ⟧realₐ            = 1ℚ
@@ -85,19 +97,23 @@ module _ (Γ : Context) (ε : Environment Γ) where
     ⟦ lessEqual x x₁ ⟧float64ᶜ = ⟦ x ⟧float64ₐ Float64.≤ᵇ ⟦ x₁ ⟧float64ₐ
     ⟦ notEqual x x₁ ⟧float64ᶜ = ⟦ x ⟧float64ₐ Float64.≠ᵇ ⟦ x₁ ⟧float64ₐ
     ⟦ equal x x₁ ⟧float64ᶜ = ⟦ x ⟧float64ₐ Float64.=ᵇ ⟦ x₁ ⟧float64ₐ
+ {-
+    module _ (τ : ElementType) where
+      postulate ⟦_⟧ₐ : ArithExpr Γ τ → ElementTypeToSet τ
+      postulate ⟦_⟧ᶜ : CompExpr Γ τ → Bool
+ -}
+    ⟦_⟧ᵇ : BoolExpr Γ → Bool
+    ⟦ (literal b) ⟧ᵇ          = b
+    ⟦ compExpr (real , snd) ⟧ᵇ = ⟦ real ⟧realᶜ snd
+    ⟦ compExpr (float64 , snd) ⟧ᵇ = ⟦ float64 ⟧float64ᶜ snd
+    ⟦ compExpr (fst , snd) ⟧ᵇ = ⟦ fst ⟧ᶜ snd
+    ⟦ (andExpr []) ⟧ᵇ         = true
+    ⟦ (andExpr (b ∷ xb)) ⟧ᵇ   = _∧_ ⟦ b ⟧ᵇ ⟦ (andExpr xb) ⟧ᵇ
+    ⟦ (orExpr []) ⟧ᵇ          = false
+    ⟦ (orExpr (b ∷ xb)) ⟧ᵇ    = _∨_ ⟦ b ⟧ᵇ ⟦  (orExpr xb) ⟧ᵇ
 
-  ⟦_⟧ᵇ : BoolExpr Γ → Bool
-  ⟦ (literal b) ⟧ᵇ          = b
-  ⟦ compExpr (real , snd) ⟧ᵇ = ⟦ real ⟧realᶜ snd
-  ⟦ compExpr (float64 , snd) ⟧ᵇ = ⟦ float64 ⟧float64ᶜ snd
-  ⟦ compExpr (fst , snd) ⟧ᵇ = ⟦ fst ⟧ᶜ snd
-  ⟦ (andExpr []) ⟧ᵇ         = true
-  ⟦ (andExpr (b ∷ xb)) ⟧ᵇ   = _∧_ ⟦ b ⟧ᵇ ⟦ (andExpr xb) ⟧ᵇ
-  ⟦ (orExpr []) ⟧ᵇ          = false
-  ⟦ (orExpr (b ∷ xb)) ⟧ᵇ    = _∨_ ⟦ b ⟧ᵇ ⟦  (orExpr xb) ⟧ᵇ
-
-  ⟦_⟧ₚ : Assertion Γ → Bool
-  ⟦ (assert p) ⟧ₚ = ⟦ p ⟧ᵇ
+    ⟦_⟧ₚ : Assertion Γ → Bool
+    ⟦ (assert p) ⟧ₚ = ⟦ p ⟧ᵇ
 
 -- Semantics of a Query
 ⟦_⟧𝕢 : Query → Set
