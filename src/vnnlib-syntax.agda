@@ -1,15 +1,13 @@
 
 module vnnlib-syntax where
 
-open import Data.List as List
-open import Data.String hiding (map)
-open import Data.Nat as ℕ
-open import Data.Rational as ℚ
-open import Data.Fin as Fin
+open import Data.List as List using (List; map)
+open import Data.String using (String)
+open import Data.Fin as Fin using (Fin)
 open import Data.Vec as Vec using (Vec; []; _∷_)
-open import Data.Bool
-open import Data.Product using (Σ; _×_; _,_; proj₁)
-open import Data.List.Membership.Propositional
+open import Data.Bool using (Bool)
+open import Data.Product using (Σ; _×_; _,_)
+open import Data.List.Membership.Propositional using (_∈_)
 
 open import vnnlib-types using (ElementType; ElementTypeToSet)
 open import tensor using (TensorShape; TensorIndices)
@@ -78,7 +76,7 @@ module _ (Γ : Context) where
   OutputRef : NetworkRef → ElementType → TensorShape → Set
   OutputRef netRef τ s = (s , τ) ∈ (NetworkType.outputShapes&Types (List.lookup Γ netRef))
 
--- Arithmetic Expressions: nary operations
+  -- Arithmetic Expressions
   data ArithExpr (τ : ElementType) : Set where
     constant : ElementTypeToSet τ → ArithExpr τ
     negate : ArithExpr τ → ArithExpr τ 
