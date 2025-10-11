@@ -26,10 +26,6 @@ tensorLookup : ∀ {shape} {A : Set} → TensorIndices shape → Tensor A shape 
 tensorLookup {[]} empty (scalar x) = x
 tensorLookup {dim ∷ shape} (non-empty idx idxs) (vector x) = tensorLookup idxs (Vec.lookup x idx)
 
-tensorLookupET : ∀ {shape} {elementType : ElementType} → TensorIndices shape → Tensor (ElementTypeToSet elementType) shape → ElementTypeToSet elementType
-tensorLookupET {[]} empty (scalar x) = x
-tensorLookupET {dim ∷ shape} (non-empty idx idxs) (vector x) = tensorLookupET idxs (Vec.lookup x idx)
-
 
 -- Example usage
 testSide₁ : Tensor ℚ (2 ∷ 2 ∷ [])
