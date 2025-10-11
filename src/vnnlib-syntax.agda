@@ -46,6 +46,12 @@ data NetworkDefinition : Set where
 Context : Set
 Context = List (NetworkType)
 
+getOutputDefs : NetworkDefinition → List OutputDefinition
+getOutputDefs (declareNetwork _ _ os) = os
+
+getInputDefs : NetworkDefinition → List InputDefinition
+getInputDefs (declareNetwork _ is _) = is
+
 convertInputΓ : InputDefinition → TensorShape × ElementType
 convertInputΓ (declareInput _ e₂ x₂) = x₂ , e₂
 
@@ -53,7 +59,7 @@ convertOutputΓ : OutputDefinition → TensorShape × ElementType
 convertOutputΓ (declareOutput _ e₂ x₂) = x₂ , e₂
 
 convertNetworkΓ : NetworkDefinition → NetworkType
-convertNetworkΓ (declareNetwork _ inputs₁ outputs₁) = networkType (List.map convertInputΓ inputs₁) (List.map convertOutputΓ outputs₁)
+convertNetworkΓ n = networkType (List.map convertInputΓ (getInputDefs n)) (List.map convertOutputΓ (getOutputDefs n))
 
 -- Network definitions are used to create the context
 mkContext : List NetworkDefinition → Context

@@ -43,3 +43,11 @@ testIndex = non-empty (# 1) (non-empty (# 1) (non-empty ((# 1)) empty))
 
 testElement : ℚ
 testElement = tensorLookup testIndex testTensor
+
+-- Scalar
+
+testTensorₛ : Tensor ℚ []
+testTensorₛ = scalar 1ℚ
+
+testIndex₁ : TensorIndices []
+testIndex₁ = empty
