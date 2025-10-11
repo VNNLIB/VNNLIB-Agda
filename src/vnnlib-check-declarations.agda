@@ -14,6 +14,8 @@ open import Data.List.Relation.Unary.Any as RUAny
 open import Relation.Nullary
 open import Data.Nat.Show
 open import Data.Maybe using (Maybe;just;nothing)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.Product
 
 open import tensor as 𝐓 using (TensorShape)
 open import syntax-utils
@@ -41,23 +43,23 @@ convertTensorShape (tensorDims xs) = parseNumbersList xs
 
 convertElementType : 𝐁.ElementType → Result 𝐄.ElementType
 convertElementType genericElementType = success real
-convertElementType elementTypeF16 = success float16
-convertElementType elementTypeF32 = success float32
+convertElementType elementTypeF16 = error "float16 not supported"
+convertElementType elementTypeF32 = error "float32 not supported"
 convertElementType elementTypeF64 = success float64
-convertElementType elementTypeBF16 = success bfloat16 
-convertElementType elementTypeF8E4M3FN = success float8e4m3fn
-convertElementType elementTypeF8E5M2 = success float8e5m2 
-convertElementType elementTypeF8E4M3FNUZ = success float8e4m3fnuz
-convertElementType elementTypeF8E5M2FNUZ = success float8e5m2fnuz
-convertElementType elementTypeF4E2M1 = success float4e2m1
-convertElementType elementTypeI8 = success int8
-convertElementType elementTypeI16 = success int16
-convertElementType elementTypeI32 = success int32
-convertElementType elementTypeI64 = success int64
-convertElementType elementTypeU8 = success uint8
-convertElementType elementTypeU16 = success uint16
-convertElementType elementTypeU32 = success uint32
-convertElementType elementTypeU64 = success uint64
+convertElementType elementTypeBF16 = error "bfloat16 not supported" 
+convertElementType elementTypeF8E4M3FN =  error "float8e4m3fn not supported"
+convertElementType elementTypeF8E5M2 = error "float8e5m2 not supported" 
+convertElementType elementTypeF8E4M3FNUZ = error "float8e4m3fnuz not supported"
+convertElementType elementTypeF8E5M2FNUZ = error "float8e5m2fnuz not supported"
+convertElementType elementTypeF4E2M1 = error "float4e2m1 not supported"
+convertElementType elementTypeI8 = error "int8 not supported"
+convertElementType elementTypeI16 = error "int16 not supported"
+convertElementType elementTypeI32 = error "int32 not supported"
+convertElementType elementTypeI64 = error "int64 not supported"
+convertElementType elementTypeU8 = error "uint8 not supported"
+convertElementType elementTypeU16 = error "uint16 not supported"
+convertElementType elementTypeU32 = error "uint32 not supported"
+convertElementType elementTypeU64 = error "uint64 not supported"
 convertElementType elementTypeC64 = error "complex64 not supported"
 convertElementType elementTypeC128 = error "complex128 not supported"
 convertElementType elementTypeBool = error "boolType not supported"
@@ -95,10 +97,21 @@ getInputIndex v is with any? (λ x → ⟦ v ⟧asStringᵥ  String.≟  ⟦ get
 ... | yes p = success (index p)
 ... | no ¬p = error "Input name not in network definition"
 
+getInputRef : (v : 𝐕.VariableName) → (is : List 𝐕.InputDefinition) →  Result (Any (λ z → ⟦ v ⟧asStringᵥ ≡ ⟦ getInputName z ⟧asStringᵥ) is)
+getInputRef v is with any? (λ x → ⟦ v ⟧asStringᵥ  String.≟  ⟦ getInputName x ⟧asStringᵥ ) is
+... | yes p = success p
+... | no ¬p = error "Input name not in network definition"
+
 getOutputIndex : 𝐕.VariableName → (os : List 𝐕.OutputDefinition) → Result (Fin (List.length os))
 getOutputIndex v os with any? (λ x → ⟦ v ⟧asStringᵥ  String.≟  ⟦ getOutputName x ⟧asStringᵥ ) os
 ... | yes p = success (index p)
 ... | no ¬p = error "Output name not in network definition"
+
+getOutputRef : (v : 𝐕.VariableName) → (os : List 𝐕.OutputDefinition) → Result (Any (λ z → ⟦ v ⟧asStringᵥ ≡ ⟦ getOutputName z ⟧asStringᵥ) os)
+getOutputRef v os with any? (λ x → ⟦ v ⟧asStringᵥ  String.≟  ⟦ getOutputName x ⟧asStringᵥ ) os
+... | yes p = success p
+... | no ¬p = error "Output name not in network definition"
+
 
 checkNetworkIndex : 𝐕.VariableName → 𝐕.NetworkDefinition → Result (Bool) -- the Bool is placeholder type
 checkNetworkIndex varName n with getInputIndex varName (getInputDefs n) | getOutputIndex varName (getOutputDefs n)
