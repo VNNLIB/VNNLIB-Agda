@@ -97,19 +97,9 @@ getInputIndex v is with any? (λ x → ⟦ v ⟧asStringᵥ  String.≟  ⟦ get
 ... | yes p = success (index p)
 ... | no ¬p = error "Input name not in network definition"
 
-getInputRef : (v : 𝐕.VariableName) → (is : List 𝐕.InputDefinition) →  Result (Any (λ z → ⟦ v ⟧asStringᵥ ≡ ⟦ getInputName z ⟧asStringᵥ) is)
-getInputRef v is with any? (λ x → ⟦ v ⟧asStringᵥ  String.≟  ⟦ getInputName x ⟧asStringᵥ ) is
-... | yes p = success p
-... | no ¬p = error "Input name not in network definition"
-
 getOutputIndex : 𝐕.VariableName → (os : List 𝐕.OutputDefinition) → Result (Fin (List.length os))
 getOutputIndex v os with any? (λ x → ⟦ v ⟧asStringᵥ  String.≟  ⟦ getOutputName x ⟧asStringᵥ ) os
 ... | yes p = success (index p)
-... | no ¬p = error "Output name not in network definition"
-
-getOutputRef : (v : 𝐕.VariableName) → (os : List 𝐕.OutputDefinition) → Result (Any (λ z → ⟦ v ⟧asStringᵥ ≡ ⟦ getOutputName z ⟧asStringᵥ) os)
-getOutputRef v os with any? (λ x → ⟦ v ⟧asStringᵥ  String.≟  ⟦ getOutputName x ⟧asStringᵥ ) os
-... | yes p = success p
 ... | no ¬p = error "Output name not in network definition"
 
 

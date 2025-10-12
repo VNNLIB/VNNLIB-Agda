@@ -4,7 +4,7 @@ open import vnnlib-check-declarations
 module vnnlib-check-assertions (Σ : List 𝐕.NetworkDefinition) where
 
 open import Data.Nat as ℕ
-open import Data.Product as Product using (proj₁; proj₂; _,_)
+open import Data.Product as Product using (proj₁; proj₂; _,_; _×_)
 open import Data.Bool as Bool
 open import Data.Integer as ℤ using (∣_∣)
 open import Data.String as String using (String; _==_)
@@ -14,12 +14,17 @@ open import Data.List.NonEmpty as List⁺
 open import Data.List.Relation.Unary.Any as RUAny
 open import Data.List.Properties using (length-map)
 open import Data.List.NonEmpty as List⁺
-open import Relation.Binary.PropositionalEquality as Eq using (_≡_; refl; sym; subst; module ≡-Reasoning)
+open import Relation.Binary.PropositionalEquality as Eq using (_≡_; refl; sym; subst; module ≡-Reasoning; cong₂)
 open Eq.≡-Reasoning
 open import Relation.Nullary
+open import Relation.Unary
 open import Data.Maybe hiding (_>>=_)
 open import Data.Nat.Show
 open import Function
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.Empty using (⊥)
+open import Data.Unit.Base using (⊤;tt)
+open import Relation.Binary.Definitions using (Decidable; DecidableEquality)
 
 open import Syntax.AST as 𝐁 hiding (String)
 open import vnnlib-types as 𝐄
@@ -51,6 +56,39 @@ validIndices (x ∷ xs) (n ∷ s) = do
   idx ← convertMaybeToResult (toFin n n')
   rest ← validIndices xs s
   return (non-empty idx rest)
+
+-- Converting an Input Index into an InputRef if refered for the expected element type
+getInputRef :
+  {n : NetworkRef Γ} →
+  (j : Fin (List.length (inputShapes&Types (List.lookup Γ n)))) →
+  (τ : 𝐄.ElementType) →
+  Result (InputRef Γ n τ (proj₁ (List.lookup (NetworkType.inputShapes&Types (List.lookup Γ n)) j)))
+getInputRef {n} j τ with τ ≡ᴱᵀ (proj₂ (List.lookup (NetworkType.inputShapes&Types (List.lookup Γ n)) j))
+... | success p = success (inputRef)
+  where
+    shape = proj₁ (List.lookup (NetworkType.inputShapes&Types (List.lookup Γ n)) j)
+    eqProof : (shape , τ) ≡ List.lookup (inputShapes&Types (List.lookup Γ n)) j
+    eqProof = cong₂ _,_ refl p 
+    inputRef : Any (_≡_ (shape , τ)) ((NetworkType.inputShapes&Types (List.lookup Γ n)))
+    inputRef = indexToAny j eqProof
+... | error _ = error "Input Type does not match assertion context"
+
+-- Converting an Output Index into an OutputRef if refered for the expected element type
+getOutputRef :
+  {n : NetworkRef Γ} →
+  (j : Fin (List.length (outputShapes&Types (List.lookup Γ n)))) →
+  (τ : 𝐄.ElementType) →
+  Result (OutputRef Γ n τ (proj₁ (List.lookup (NetworkType.outputShapes&Types (List.lookup Γ n)) j)))
+getOutputRef {n} j τ with τ ≡ᴱᵀ (proj₂ (List.lookup (NetworkType.outputShapes&Types (List.lookup Γ n)) j))
+... | success p = success (inputRef)
+  where
+    shape = proj₁ (List.lookup (NetworkType.outputShapes&Types (List.lookup Γ n)) j)
+    eqProof : (shape , τ) ≡ List.lookup (outputShapes&Types (List.lookup Γ n)) j
+    eqProof = cong₂ _,_ refl p 
+    inputRef : Any (_≡_ (shape , τ)) ((NetworkType.outputShapes&Types (List.lookup Γ n)))
+    inputRef = indexToAny j eqProof
+... | error _ = error "Output Type does not match assertion context"
+
 
 mutual
     inferArithExprType : 𝐁.ArithExpr → Maybe 𝐄.ElementType
@@ -87,17 +125,17 @@ mutual
     ... | success n with getInputIndex (convertVariableName x) (getInputDefs (List.lookup Σ n)) | getOutputIndex (convertVariableName x) (getOutputDefs (List.lookup Σ n))
     ... | error x₁ | error x₂ = error x₁
     ... | error x₁ | success o = do
-        let networkInd = cast (length-Context Σ) n
+        let netRef = cast (length-Context Σ) n
         let outputInd = cast (length-outputs Σ n) o
-        let outputDecl = List.lookup (getOutputDefs (List.lookup Σ n)) o        
-        indicesₒ ← validIndices xs (proj₁ (List.lookup (outputShapes&Types (List.lookup Γ networkInd)) outputInd))
-        if isSameType τ (getElementTypeₒ outputDecl) then success (varOutput networkInd outputInd indicesₒ) else error "Variable type mismatch"
+        outputRef ← getOutputRef outputInd τ
+        indices ← validIndices xs (proj₁ (List.lookup (outputShapes&Types (List.lookup Γ netRef)) outputInd))
+        return (varOutput netRef outputRef indices)
     ... | success i | _ = do
-        let networkInd = cast (length-Context Σ) n
+        let netRef = cast (length-Context Σ) n
         let inputInd = cast (length-inputs Σ n) i
-        let inputDecl = List.lookup (getInputDefs (List.lookup Σ n)) i        
-        indicesₒ ← validIndices xs (proj₁ (List.lookup (inputShapes&Types (List.lookup Γ networkInd)) inputInd))
-        if isSameType τ (getElementTypeᵢ inputDecl) then success (varInput networkInd inputInd indicesₒ) else error "Variable type mismatch"
+        inputRef ← getInputRef inputInd τ
+        indices ← validIndices xs (proj₁ (List.lookup (inputShapes&Types (List.lookup Γ netRef)) inputInd))
+        return (varInput netRef inputRef indices)
     checkArithExpr τ (negate a) with checkArithExpr τ a
     ... | error e = error e
     ... | success x = success (negate x)
