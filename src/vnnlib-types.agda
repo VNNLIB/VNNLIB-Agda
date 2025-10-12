@@ -3,6 +3,11 @@ module vnnlib-types where
 open import Data.Rational as ℚ
 open import Data.Bool
 open import Agda.Builtin.Float using (Float)
+open import Data.String using (String)
+open import Level
+open import Data.Sum.Effectful.Left String 0ℓ renaming (Sumₗ to Result)
+open import Data.Sum.Base renaming (inj₁ to error; inj₂ to success)
+open import Relation.Binary.PropositionalEquality as Eq using (_≡_;refl)
 
 -- -- Element Types
 data ElementType : Set where
@@ -32,23 +37,9 @@ ElementTypeToSet : ElementType → Set
 ElementTypeToSet real = ℚ
 ElementTypeToSet float64 = Float
 
-isSameType : ElementType → ElementType → Bool
-isSameType real real = true
-isSameType float64 float64 = true
--- isSameType float16 float16 = true
--- isSameType float32 float32 = true
--- isSameType bfloat16 bfloat16 = true
--- isSameType float8e4m3fn float8e4m3fn = true
--- isSameType float8e5m2 float8e5m2 = true
--- isSameType float8e4m3fnuz float8e4m3fnuz = true
--- isSameType float8e5m2fnuz float8e5m2fnuz = true
--- isSameType float4e2m1 float4e2m1 = true
--- isSameType int8 int8 = true
--- isSameType int16 int16 = true
--- isSameType int32 int32 = true
--- isSameType int64 int64 = true
--- isSameType uint8 uint8 = true
--- isSameType uint16 uint16 = true
--- isSameType uint32 uint32 = true
--- isSameType uint64 uint64 = true
-isSameType _ _ = false
+-- Equivalence between two element types
+_≡ᴱᵀ_ : (τ₁ : ElementType) → (τ₂ : ElementType) → Result (τ₁ ≡ τ₂)
+real ≡ᴱᵀ real = success refl
+real ≡ᴱᵀ float64 = error "Type mismatch"
+float64 ≡ᴱᵀ real = error "Type mismatch"
+float64 ≡ᴱᵀ float64 = success refl
