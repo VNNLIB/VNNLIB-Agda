@@ -1,14 +1,13 @@
 
 module vnnlib-syntax where
 
-open import Data.List as List
-open import Data.String hiding (map)
-open import Data.Nat as ℕ
-open import Data.Rational as ℚ
-open import Data.Fin as Fin
+open import Data.List as List using (List; map)
+open import Data.String using (String)
+open import Data.Fin as Fin using (Fin)
 open import Data.Vec as Vec using (Vec; []; _∷_)
-open import Data.Bool
-open import Data.Product using (Σ; _×_; _,_; proj₁)
+open import Data.Bool using (Bool)
+open import Data.Product using (Σ; _×_; _,_)
+open import Data.List.Membership.Propositional using (_∈_)
 
 open import vnnlib-types using (ElementType; ElementTypeToSet)
 open import tensor using (TensorShape; TensorIndices)
@@ -63,18 +62,26 @@ convertNetworkΓ n = networkType (List.map convertInputΓ (getInputDefs n)) (Lis
 
 -- Network definitions are used to create the context
 mkContext : List NetworkDefinition → Context
-mkContext networkDefinitions = List.map convertNetworkΓ networkDefinitions
+mkContext networkDefinitions = List.map convertNetworkΓ networkDefinitions 
+
 
 -- Assertions
 module _ (Γ : Context) where
--- Arithmetic Expressions: nary operations
+  NetworkRef : Set
+  NetworkRef = Fin (List.length Γ)
+
+  InputRef : NetworkRef → ElementType → TensorShape → Set
+  InputRef netRef τ s = (s , τ) ∈ (NetworkType.inputShapes&Types (List.lookup Γ netRef))
+
+  OutputRef : NetworkRef → ElementType → TensorShape → Set
+  OutputRef netRef τ s = (s , τ) ∈ (NetworkType.outputShapes&Types (List.lookup Γ netRef))
+
+  -- Arithmetic Expressions
   data ArithExpr (τ : ElementType) : Set where
     constant : ElementTypeToSet τ → ArithExpr τ
     negate : ArithExpr τ → ArithExpr τ 
-    varInput : (i : Fin (List.length Γ)) → (j : Fin ( List.length (NetworkType.inputShapes&Types (List.lookup Γ i)) ) ) →
-      TensorIndices (proj₁ (List.lookup (NetworkType.inputShapes&Types (List.lookup Γ i)) j )) → ArithExpr τ
-    varOutput : (i : Fin (List.length Γ)) →  (j : Fin ( List.length (NetworkType.outputShapes&Types (List.lookup Γ i)) ) ) →
-      TensorIndices (proj₁ (List.lookup (NetworkType.outputShapes&Types (List.lookup Γ i)) j))  → ArithExpr τ
+    varInput : {shape : TensorShape} (i : NetworkRef) (j : InputRef i τ shape) → TensorIndices shape → ArithExpr τ
+    varOutput : {shape : TensorShape} (i : NetworkRef) (j : OutputRef i τ shape) → TensorIndices shape → ArithExpr τ
     add : List (ArithExpr τ) → ArithExpr τ
     minus : List (ArithExpr τ) → ArithExpr τ
     mult  : List (ArithExpr τ) → ArithExpr τ

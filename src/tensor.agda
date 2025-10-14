@@ -5,6 +5,7 @@ open import Data.Fin as Fin
 open import Data.List as List
 open import Data.Vec as Vec using (Vec; []; _∷_)
 open import Data.Rational as ℚ
+open import vnnlib-types
 
 
 -- Tensor
@@ -21,7 +22,7 @@ data Tensor (Σ : Set) : TensorShape → Set where
   vector : {head : ℕ} → {tail : List ℕ} → Vec (Tensor Σ tail) head → Tensor Σ (head ∷ tail)
 
 
-tensorLookup : ∀ {shape} → TensorIndices shape → Tensor ℚ shape → ℚ
+tensorLookup : ∀ {shape} {A : Set} → TensorIndices shape → Tensor A shape → A
 tensorLookup {[]} empty (scalar x) = x
 tensorLookup {dim ∷ shape} (non-empty idx idxs) (vector x) = tensorLookup idxs (Vec.lookup x idx)
 
