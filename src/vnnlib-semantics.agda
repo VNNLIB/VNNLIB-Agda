@@ -107,7 +107,6 @@ module _ (Γ : Context) where
 -- Semantics of a Query
 ⟦_⟧𝕢 : Query → Set
 ⟦ mkQuery networks assertions ⟧𝕢 =
-  let Γ = mkContext networks in (n : NetworkImplementations Γ) → ∃ λ (x : Assignments Γ) → List.foldl (λ z z₁ → and (z ∷ ⟦ Γ ⟧ₚ (n , x) z₁ ∷ [])) true assertions ≡ true
-
-
+  let Γ = mkContext networks in (n : NetworkImplementations Γ) → ∃ λ (x : Assignments Γ) → 
+              List.foldl (λ z z₁ → and (z ∷ ⟦ Γ ⟧ₚ (n , x) z₁ ∷ [])) true assertions ≡ true
 

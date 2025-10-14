@@ -1,4 +1,3 @@
-
 module vnnlib-syntax where
 
 open import Data.List as List using (List; map)
