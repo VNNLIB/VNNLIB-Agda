@@ -1,6 +1,6 @@
-module vnnlib-semantics-demo where
+module VNNLIB.Example where
 
-open import Data.String using (String; fromList)
+open import Data.String.Base using (String; fromList)
 open import Data.Nat
 open import Data.Bool
 open import Data.Product using (_,_)

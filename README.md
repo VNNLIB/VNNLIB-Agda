@@ -1,17 +1,18 @@
 # VNNLIB-Agda
-⚠️ Work-in-Progress: Agda parser for VNNLIB.
 
-This repository includes the following for Agda formalisation for the [VNN-LIB standard](https://github.com/VNNLIB/VNNLIB-Standard/):
-- Formal syntax and semantics of a query
-- Formalisation of a well-scoped & well-typed query including a parser
+This repository is a formalisation of the [VNN-LIB standard](https://github.com/VNNLIB/VNNLIB-Standard/).
+It includes:
+- Syntax for well-typed VNNLIB queries
+- A parser and type-checker for VNNLIB queries
+- Formal semantics for VNNLIB queries
 
-## Additional Software Requirements
-
-Later versions may work but are not tested.
+## Requirements
 
 - [Agda Standard Library](https://github.com/agda/agda-stdlib) (v2.3): utilized in the Agda formalization
 - [VNNLIB-Standard](https://github.com/VNNLIB/VNNLIB-Standard) (v2.0): syntax: this is added as a submodule to this project.
 - [BNFC Parser](https://hackage.haskell.org/package/BNFC) (v2.9.5): this is to generate the AST using the Agda backened from the syntax file.
+
+Later versions of these tools may work but are not tested.
 
 ## Setup
 

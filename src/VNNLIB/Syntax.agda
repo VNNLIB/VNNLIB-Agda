@@ -1,107 +1,226 @@
-module VNNLIB.Syntax where
+open import ONNX.Syntax
 
-open import Data.List as List using (List; map)
-open import Data.String using (String)
-open import Data.Fin as Fin using (Fin)
-open import Data.Vec as Vec using (Vec; []; _∷_)
-open import Data.Bool using (Bool)
-open import Data.Product using (Σ; _×_; _,_)
-open import Data.List.Membership.Propositional using (_∈_)
+module VNNLIB.Syntax
+  (theorySyntax : NetworkTheorySyntax)
+  where
+
+open import Data.List.Base as List using (List; []; map)
+open import Data.List.NonEmpty.Base as List⁺ using (List⁺)
+open import Data.String.Base using (String)
+open import Data.Fin.Base as Fin using (Fin)
+open import Data.Vec.Base as Vec using (Vec; []; _∷_)
+open import Data.Bool.Base using (Bool)
+open import Data.Product.Base using (Σ; _×_; _,_)
+open import Data.Unit.Base using (⊤)
+open import Level
+open import Relation.Unary.Indexed using (IPred)
+open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Function.Base using (const)
+
+open import Data.List.NonEmpty.Membership.Propositional using (_∈_)
+open import Data.Real
 open import Data.Tensor using (TensorShape; TensorIndices)
 
-open import VNNLIB.Types using (ElementType; ElementTypeToSet)
+open NetworkTheorySyntax theorySyntax
 
--- Variables
---  -- Naming/referencing
-data VariableName : Set where
-  SVariableName : String → VariableName
+------------------
+-- Declarations --
+------------------
 
--- Declarations are used to contruct the context
--- -- Each entry in the context is a network type
-record NetworkType : Set where
-  constructor
-    networkType
+Name : Set
+Name = String
+
+------------------------
+-- Input declarations --
+------------------------
+
+record InputDeclaration : Set where
+  constructor declareInput
   field
-    inputShapes&Types : List (TensorShape × ElementType )
-    outputShapes&Types : List (TensorShape × ElementType )
+    inputName : Name
+    inputType : TensorType TheoryType
 
+open InputDeclaration public
 
--- Node Definitions
-data InputDefinition : Set where
-  declareInput : VariableName → ElementType → TensorShape → InputDefinition
+-------------------------
+-- Output declarations --
+-------------------------
 
-data OutputDefinition : Set where
-  declareOutput : VariableName → ElementType → TensorShape → OutputDefinition
+record OutputDeclaration : Set where
+  constructor declareOutput
+  field
+    outputName : Name
+    outputType : TensorType TheoryType
 
--- Network Definitions
-data NetworkDefinition : Set where
-  declareNetwork : VariableName → List InputDefinition → List OutputDefinition → NetworkDefinition
+open OutputDeclaration public
 
--- Context is a list of network types
-Context : Set
-Context = List (NetworkType)
+--------------
+-- Networks --
+--------------
+--
+-- Network declarations may contain back-references to earlier
+-- network declarations via `equal-to` and `isomorphic-to` statements.
+-- Therefore it is necessary to define these concepts mutually.
 
-getOutputDefs : NetworkDefinition → List OutputDefinition
-getOutputDefs (declareNetwork _ _ os) = os
+mutual
 
-getInputDefs : NetworkDefinition → List InputDefinition
-getInputDefs (declareNetwork _ is _) = is
+  ----------------------
+  -- Network contexts --
+  ----------------------
 
-convertInputΓ : InputDefinition → TensorShape × ElementType
-convertInputΓ (declareInput _ e₂ x₂) = x₂ , e₂
+  data NetworkContext : Set where
+    [] : NetworkContext
+    _∷_ : (Γ : NetworkContext) → NetworkDeclaration Γ → NetworkContext
 
-convertOutputΓ : OutputDefinition → TensorShape × ElementType
-convertOutputΓ (declareOutput _ e₂ x₂) = x₂ , e₂
+  ------------------------
+  -- Network definition --
+  ------------------------
+  
+  record NetworkDeclaration (Γ : NetworkContext) : Set where
+    constructor declareNetwork
+    field
+      networkName    : Name
+      networkInputs  : List⁺ InputDeclaration
+      networkOutputs : List⁺ OutputDeclaration
 
-convertNetworkΓ : NetworkDefinition → NetworkType
-convertNetworkΓ n = networkType (List.map convertInputΓ (getInputDefs n)) (List.map convertOutputΓ (getOutputDefs n))
+  typeOfInputs : ∀ {Γ} → NetworkDeclaration Γ → InputTypes TheoryType
+  typeOfInputs n = List⁺.map inputType (NetworkDeclaration.networkInputs n)
 
--- Network definitions are used to create the context
-mkContext : List NetworkDefinition → Context
-mkContext networkDefinitions = List.map convertNetworkΓ networkDefinitions 
+  typeOfOutputs : ∀ {Γ} → NetworkDeclaration Γ → OutputTypes TheoryType
+  typeOfOutputs n = List⁺.map outputType (NetworkDeclaration.networkOutputs n)
 
+  typeOfNetwork : ∀ {Γ} → NetworkDeclaration Γ → NetworkType TheoryType
+  typeOfNetwork n = networkType (typeOfInputs n) (typeOfOutputs n)
 
--- Assertions
-module _ (Γ : Context) where
-  NetworkRef : Set
-  NetworkRef = Fin (List.length Γ)
+  ---------------------------------------
+  -- Restrictions on network variables --
+  ---------------------------------------
+ 
+  Restriction : Set₁
+  Restriction = IPred NetworkDeclaration 0ℓ
 
-  InputRef : NetworkRef → ElementType → TensorShape → Set
-  InputRef netRef τ s = (s , τ) ∈ (NetworkType.inputShapes&Types (List.lookup Γ netRef))
+  postulate ValidEqualToTarget : Restriction
 
-  OutputRef : NetworkRef → ElementType → TensorShape → Set
-  OutputRef netRef τ s = (s , τ) ∈ (NetworkType.outputShapes&Types (List.lookup Γ netRef))
+  postulate ValidIsomorphicToTarget : Restriction
 
-  -- Arithmetic Expressions
-  data ArithExpr (τ : ElementType) : Set where
-    constant : ElementTypeToSet τ → ArithExpr τ
-    negate : ArithExpr τ → ArithExpr τ 
-    varInput : {shape : TensorShape} (i : NetworkRef) (j : InputRef i τ shape) → TensorIndices shape → ArithExpr τ
-    varOutput : {shape : TensorShape} (i : NetworkRef) (j : OutputRef i τ shape) → TensorIndices shape → ArithExpr τ
-    add : List (ArithExpr τ) → ArithExpr τ
-    minus : List (ArithExpr τ) → ArithExpr τ
-    mult  : List (ArithExpr τ) → ArithExpr τ
+  HasInputMatching : TensorType TheoryType → Restriction
+  HasInputMatching type network = type ∈ typeOfInputs network
 
-  -- Comparative Expressions : 2-ary operations
-  data CompExpr (τ : ElementType) : Set where
-    greaterThan    : ArithExpr τ → ArithExpr τ → CompExpr τ
-    lessThan       : ArithExpr τ → ArithExpr τ → CompExpr τ
-    greaterEqual   : ArithExpr τ → ArithExpr τ → CompExpr τ
-    lessEqual      : ArithExpr τ → ArithExpr τ → CompExpr τ
-    notEqual       : ArithExpr τ → ArithExpr τ → CompExpr τ
-    equal          : ArithExpr τ → ArithExpr τ → CompExpr τ
+  HasOutputMatching : TensorType TheoryType → Restriction
+  HasOutputMatching type network = type ∈ typeOfOutputs network
 
-  -- Boolean Expressions: Connective and Comparative Expressions
+  -----------------------
+  -- Network variables --
+  -----------------------
+
+  -- A reference to a network in the context that satisfies some property P
+  data AbstractVariable (P : Restriction) : NetworkContext → Set where
+    here : ∀ {ns n} → P n → AbstractVariable P (ns ∷ n)
+    there : ∀ {ns n} → AbstractVariable P ns → AbstractVariable P (ns ∷ n)
+
+  -- A reference to a network that is equal to the current network
+  EqualNetworkVariable : NetworkContext → Set
+  EqualNetworkVariable = AbstractVariable ValidEqualToTarget
+
+  -- A reference to a network that is isomorphic to the current network
+  IsomorphicNetworkVariable : NetworkContext → Set
+  IsomorphicNetworkVariable = AbstractVariable ValidIsomorphicToTarget
+
+open NetworkDeclaration public
+
+-------------
+-- Numbers --
+-------------
+
+Number : TheoryType → Set
+Number τ = TheoryTensor (tensorType τ [])
+
+--------------------
+-- Node variables --
+--------------------  
+
+NodeVariableSort : Set₁
+NodeVariableSort = NetworkContext → TensorType TheoryType → Set
+
+InputVariable : NodeVariableSort
+InputVariable Γ sig = AbstractVariable (HasInputMatching sig) Γ
+
+OutputVariable : NodeVariableSort
+OutputVariable Γ sig = AbstractVariable (HasOutputMatching sig) Γ
+
+-----------------------
+-- Element variables --
+-----------------------
+
+record ElementVariable (NodeVariable : NodeVariableSort) (Γ : NetworkContext) (τ : TheoryType) : Set where
+  constructor elementVar
+  field
+    shape   : TensorShape
+    node    : NodeVariable Γ (tensorType τ shape)
+    indices : TensorIndices shape
+
+InputElementVariable : NetworkContext → TheoryType → Set
+InputElementVariable = ElementVariable InputVariable
+
+OutputElementVariable : NetworkContext → TheoryType  → Set
+OutputElementVariable = ElementVariable OutputVariable
+
+--------------------------
+-- Assertion components --
+--------------------------
+
+module _ (Γ : NetworkContext) where
+
+  ----------------------------
+  -- Arithmetic expressions --
+  ----------------------------
+  
+  data ArithExpr (τ : TheoryType) : Set where
+    constant  : Number τ → ArithExpr τ
+    negate    : ArithExpr τ → ArithExpr τ 
+    inputVar  : InputElementVariable Γ τ → ArithExpr τ
+    outputVar : OutputElementVariable Γ τ → ArithExpr τ
+    add       : List⁺ (ArithExpr τ) → ArithExpr τ
+    sub       : List⁺ (ArithExpr τ) → ArithExpr τ
+    mul       : List⁺ (ArithExpr τ) → ArithExpr τ
+
+  ----------------------------
+  -- Comparison expressions --
+  ----------------------------
+
+  data CompExpr (τ : TheoryType) : Set where
+    greaterThan  : ArithExpr τ → ArithExpr τ → CompExpr τ
+    lessThan     : ArithExpr τ → ArithExpr τ → CompExpr τ
+    greaterEqual : ArithExpr τ → ArithExpr τ → CompExpr τ
+    lessEqual    : ArithExpr τ → ArithExpr τ → CompExpr τ
+    notEqual     : ArithExpr τ → ArithExpr τ → CompExpr τ
+    equal        : ArithExpr τ → ArithExpr τ → CompExpr τ
+
+  -------------------------
+  -- Boolean expressions --
+  -------------------------
+
   data BoolExpr : Set where
-    literal : Bool → BoolExpr
-    compExpr : Σ ElementType CompExpr → BoolExpr
-    andExpr : List BoolExpr → BoolExpr
-    orExpr  : List BoolExpr → BoolExpr
+    literal  : Bool → BoolExpr
+    compExpr : Σ TheoryType CompExpr → BoolExpr
+    andExpr  : List⁺ BoolExpr → BoolExpr
+    orExpr   : List⁺ BoolExpr → BoolExpr
 
-  -- Assertions : evalute to true or false
+  ----------------
+  -- Assertions --
+  ----------------
+
   data Assertion : Set where
     assert : BoolExpr → Assertion
 
--- Query
-data Query : Set where
-  mkQuery : (networks : List NetworkDefinition) → List (Assertion (mkContext networks)) → Query
+-------------
+-- Queries --
+-------------
+
+record Query : Set where
+  constructor query
+  field
+    context : NetworkContext
+    assertions : List (Assertion context)
+
+open Query public

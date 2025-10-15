@@ -1,114 +1,192 @@
-module VNNLIB.Semantics where
+open import ONNX.Syntax
+open import ONNX.Semantics
 
+module VNNLIB.Semantics
+  {onnxSyntax : NetworkTheorySyntax}
+  (onnxSemantics : NetworkTheorySemantics onnxSyntax)
+  where
+
+open import Algebra.Core using (Op₂)
 open import Data.Bool.ListAction using (and)
 open import Data.List.Base as List hiding (and)
+open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import Data.List.NonEmpty as List⁺ using (List⁺; _∷_)
+open import Data.List.NonEmpty.Relation.Unary.All using () renaming (All to All⁺)
 open import Data.String.Base hiding (map)
-open import Data.Rational.Base as ℚ
-open import Data.Bool.Base
-open import Data.Fin.Base as Fin
+open import Data.Bool.Base renaming (T to True)
+open import Data.Fin.Base as Fin using ()
 open import Data.Product.Base as Product
 open import Relation.Binary.PropositionalEquality as Eq using (_≡_)
-open import Agda.Builtin.Float
+open import Function.Base
+open import Relation.Nullary.Decidable using (Dec)
 
+open import Relation.Unary using ()
+open import Data.Real as ℝ
 open import Data.RationalUtils as Real
-open import Data.FloatUtils as Float64
-open import VNNLIB.Types
-open import VNNLIB.Syntax
+open import VNNLIB.Syntax onnxSyntax
 open import Data.Tensor
+open import Data.List.NonEmpty.Relation.Unary.Any as Any⁺ using () renaming (Any to Any⁺)
+import Data.List.NonEmpty.Relation.Unary.AllUtils as All⁺
+open import Data.List.NonEmpty.Membership.Propositional as ∈ using (_∈_)
+
+open NetworkTheorySyntax onnxSyntax
+open NetworkTheorySemantics onnxSemantics
 
 private
   variable
-    τ : ElementType
+    Γ : NetworkContext
+    τ : TheoryType
     shape : TensorShape
 
--- Semantics of Assertions
-module _ (Γ : Context) where
+---------------------------
+-- Abstract environments --
+---------------------------
 
-  -- Network Implementation Representation
-  InputTensor : (i : NetworkRef Γ) → InputRef Γ i τ shape → Set
-  InputTensor  {τ} {shape} i j = Tensor (ElementTypeToSet τ) shape
+-- Associates every declared network `d` in the context with some dependent value of type `P d`
+data AbstractEnvironment (P : Restriction) : NetworkContext → Set where
+  [] : AbstractEnvironment P []
+  _∷_ : ∀ {Γ d} (Δ : AbstractEnvironment P Γ) (Δₙ : P d) → AbstractEnvironment P (Γ ∷ d)
 
-  InputTensors : (i : NetworkRef Γ) → Set
-  InputTensors i = ∀ {τ} {shape} (j : InputRef Γ i τ shape) → InputTensor i j
+mapEnvironment : {P Q : Restriction} → (∀ {Γ} {d : NetworkDeclaration Γ} → P d → Q d) → AbstractEnvironment P Γ → AbstractEnvironment Q Γ
+mapEnvironment f []       = []
+mapEnvironment f (Δ ∷ Δₙ) = mapEnvironment f Δ ∷ f Δₙ
 
-  OutputTensor : (i : NetworkRef Γ) → OutputRef Γ i τ shape → Set
-  OutputTensor {τ} {shape} i j = Tensor (ElementTypeToSet τ) shape
+zipEnvironment : {P Q R : Restriction} → (∀ {Γ} {d : NetworkDeclaration Γ} → P d → Q d → R d) → AbstractEnvironment P Γ → AbstractEnvironment Q Γ → AbstractEnvironment R Γ
+zipEnvironment f [] []       = []
+zipEnvironment f (Δ₁ ∷ Δ₁ₙ) (Δ₂ ∷ Δ₂ₙ) = zipEnvironment f Δ₁ Δ₂ ∷ f Δ₁ₙ Δ₂ₙ
 
-  OutputTensors : (i : NetworkRef Γ) → Set
-  OutputTensors i = ∀ {τ} {shape} (j : OutputRef Γ i τ shape) → OutputTensor i j
+lookupInEnvironment : {P Q : Restriction} → AbstractEnvironment P Γ → AbstractVariable Q Γ → Σ NetworkContext (λ Γ' → Σ (NetworkDeclaration Γ') (λ n → P n × Q n))
+lookupInEnvironment (Δ ∷ Δₙ) (here Px)    = _ , _ , Δₙ , Px
+lookupInEnvironment (Δ ∷ Δₙ) (there Pxs) = lookupInEnvironment Δ Pxs
 
-  NetworkImplementation : NetworkRef Γ → Set
-  NetworkImplementation i = InputTensors i → OutputTensors i
+----------------------
+-- Runtime networks --
+----------------------
 
-  -- Environment Representation
-  Assignments : Set
-  Assignments = (i : NetworkRef Γ) → InputTensors i
+NetworkImplementation : Restriction
+NetworkImplementation d = TheoryNetwork (typeOfNetwork d)
 
-  NetworkImplementations : Set
-  NetworkImplementations = (i : NetworkRef Γ) → NetworkImplementation i
+NetworkImplementations : NetworkContext → Set
+NetworkImplementations = AbstractEnvironment NetworkImplementation
 
-  Environment : Set
-  Environment = NetworkImplementations × Assignments
+-----------------------
+-- Input assignments --
+-----------------------
 
-  module _ (ε : Environment) where
-    -- Semantics for real --
-    ⟦_⟧realₐ : ArithExpr Γ real → ℚ
-    ⟦ (constant a) ⟧realₐ        = a
-    ⟦ (negate a) ⟧realₐ           = 0ℚ ℚ.- ⟦ a ⟧realₐ
-    ⟦ (varInput i j indices) ⟧realₐ = tensorLookup indices (proj₂ ε i j)
-    ⟦ (varOutput i j indices) ⟧realₐ = tensorLookup indices ((proj₁ ε i) (proj₂ ε i) j)
-    ⟦ (add []) ⟧realₐ             = 0ℚ
-    ⟦ (add (a₀ ∷ a)) ⟧realₐ       = ⟦ a₀ ⟧realₐ ℚ.+ ⟦ (add a) ⟧realₐ
-    ⟦ (mult []) ⟧realₐ            = 1ℚ
-    ⟦ (mult (a₀ ∷ a)) ⟧realₐ      = ⟦ a₀ ⟧realₐ ℚ.* ⟦ (mult a) ⟧realₐ
-    ⟦ (minus []) ⟧realₐ           = 0ℚ
-    ⟦ (minus (a₀ ∷ a)) ⟧realₐ     = ⟦ a₀ ⟧realₐ ℚ.- ⟦ (add a) ⟧realₐ
+NetworkInputAssignment : Restriction
+NetworkInputAssignment d = All⁺ TheoryTensor (typeOfInputs d)
 
-    ⟦_⟧realᶜ : CompExpr Γ real → Bool
-    ⟦ greaterThan x x₁ ⟧realᶜ = ⟦ x ⟧realₐ Real.>ᵇ ⟦ x₁ ⟧realₐ
-    ⟦ lessThan x x₁ ⟧realᶜ = ⟦ x ⟧realₐ Real.<ᵇ ⟦ x₁ ⟧realₐ
-    ⟦ greaterEqual x x₁ ⟧realᶜ = ⟦ x ⟧realₐ Real.≥ᵇ ⟦ x₁ ⟧realₐ
-    ⟦ lessEqual x x₁ ⟧realᶜ = ⟦ x ⟧realₐ ℚ.≤ᵇ ⟦ x₁ ⟧realₐ
-    ⟦ notEqual x x₁ ⟧realᶜ = ⟦ x ⟧realₐ Real.≠ᵇ ⟦ x₁ ⟧realₐ
-    ⟦ equal x x₁ ⟧realᶜ = ⟦ x ⟧realₐ Real.=ᵇ ⟦ x₁ ⟧realₐ
-    
-    -- Semantics for float64 --
-    ⟦_⟧float64ₐ : ArithExpr Γ float64 → Float
-    ⟦ (constant a) ⟧float64ₐ        = a
-    ⟦ (negate a) ⟧float64ₐ           = primFloatMinus 0.0 ⟦ a ⟧float64ₐ
-    ⟦ (varInput i j indices ) ⟧float64ₐ = tensorLookup indices (proj₂ ε i j)
-    ⟦ (varOutput i j indices) ⟧float64ₐ = tensorLookup indices ((proj₁ ε i) (proj₂ ε i) j)
-    ⟦ (add []) ⟧float64ₐ             = 0.0
-    ⟦ (add (a₀ ∷ a)) ⟧float64ₐ       = primFloatPlus ⟦ a₀ ⟧float64ₐ ⟦ (add a) ⟧float64ₐ
-    ⟦ (mult []) ⟧float64ₐ            = 1.0
-    ⟦ (mult (a₀ ∷ a)) ⟧float64ₐ      = primFloatTimes ⟦ a₀ ⟧float64ₐ ⟦ (mult a) ⟧float64ₐ
-    ⟦ (minus []) ⟧float64ₐ           = 0.0
-    ⟦ (minus (a₀ ∷ a)) ⟧float64ₐ     = primFloatMinus ⟦ a₀ ⟧float64ₐ  ⟦ (add a) ⟧float64ₐ
+NetworkInputAssignments : NetworkContext → Set
+NetworkInputAssignments = AbstractEnvironment NetworkInputAssignment
 
-    ⟦_⟧float64ᶜ : CompExpr Γ float64 → Bool
-    ⟦ greaterThan x x₁ ⟧float64ᶜ = ⟦ x ⟧float64ₐ Float64.>ᵇ ⟦ x₁ ⟧float64ₐ
-    ⟦ lessThan x x₁ ⟧float64ᶜ = ⟦ x ⟧float64ₐ Float64.<ᵇ ⟦ x₁ ⟧float64ₐ
-    ⟦ greaterEqual x x₁ ⟧float64ᶜ = ⟦ x ⟧float64ₐ Float64.≥ᵇ ⟦ x₁ ⟧float64ₐ
-    ⟦ lessEqual x x₁ ⟧float64ᶜ = ⟦ x ⟧float64ₐ Float64.≤ᵇ ⟦ x₁ ⟧float64ₐ
-    ⟦ notEqual x x₁ ⟧float64ᶜ = ⟦ x ⟧float64ₐ Float64.≠ᵇ ⟦ x₁ ⟧float64ₐ
-    ⟦ equal x x₁ ⟧float64ᶜ = ⟦ x ⟧float64ₐ Float64.=ᵇ ⟦ x₁ ⟧float64ₐ
+-----------------
+-- Environment --
+-----------------
 
-    ⟦_⟧ᵇ : BoolExpr Γ → Bool
-    ⟦ (literal b) ⟧ᵇ          = b
-    ⟦ compExpr (real , snd) ⟧ᵇ = ⟦ snd ⟧realᶜ
-    ⟦ compExpr (float64 , snd) ⟧ᵇ = ⟦ snd ⟧float64ᶜ
---    ⟦ compExpr (fst , snd) ⟧ᵇ = ⟦ fst ⟧ᶜ snd
-    ⟦ (andExpr []) ⟧ᵇ         = true
-    ⟦ (andExpr (b ∷ xb)) ⟧ᵇ   = _∧_ ⟦ b ⟧ᵇ ⟦ (andExpr xb) ⟧ᵇ
-    ⟦ (orExpr []) ⟧ᵇ          = false
-    ⟦ (orExpr (b ∷ xb)) ⟧ᵇ    = _∨_ ⟦ b ⟧ᵇ ⟦  (orExpr xb) ⟧ᵇ
+record NetworkVariableValues (d : NetworkDeclaration Γ) : Set where
+  constructor variableValues
+  field
+    ⟦inputs⟧  : InputsSemantics ⟦theoryType⟧ (typeOfInputs d)
+    ⟦outputs⟧ : OutputsSemantics ⟦theoryType⟧ (typeOfOutputs d)
 
-    ⟦_⟧ₚ : Assertion Γ → Bool
-    ⟦ (assert p) ⟧ₚ = ⟦ p ⟧ᵇ
+createNetworkVariableValues : ∀ {d : NetworkDeclaration Γ} → NetworkImplementation d → NetworkInputAssignment d → NetworkVariableValues d 
+createNetworkVariableValues network inputs = do
+  let ⟦inputs⟧ = All⁺.map ⟦theoryTensor⟧ inputs
+  let ⟦network⟧ = ⟦theoryNetwork⟧ network
+  let ⟦outputs⟧ = ⟦network⟧ ⟦inputs⟧
+  variableValues ⟦inputs⟧ ⟦outputs⟧
 
--- Semantics of a Query
-⟦_⟧𝕢 : Query → Set
-⟦ mkQuery networks assertions ⟧𝕢 =
-  let Γ = mkContext networks in (n : NetworkImplementations Γ) → ∃ λ (x : Assignments Γ) → 
-              List.foldl (λ z z₁ → and (z ∷ ⟦ Γ ⟧ₚ (n , x) z₁ ∷ [])) true assertions ≡ true
+Environment : NetworkContext → Set
+Environment = AbstractEnvironment NetworkVariableValues
 
+createEnvironment : NetworkImplementations Γ → NetworkInputAssignments Γ → Environment Γ
+createEnvironment = zipEnvironment createNetworkVariableValues
+
+--------------------------
+-- Assertion components --
+--------------------------
+
+module _ {Γ : NetworkContext} (Δ : Environment Γ) where
+
+  ---------------
+  -- Variables --
+  ---------------
+
+  ⟦constant⟧ : TheoryType → Set
+  ⟦constant⟧ τ = TensorSemantics ⟦theoryType⟧ (tensorType τ [])
+  
+  ⟦inputVar⟧ : ∀ {τ} → InputElementVariable Γ τ → ⟦constant⟧ τ
+  ⟦inputVar⟧ (elementVar _ inputNode indices) = do
+    let (_ , _ , variableValues ⟦inputs⟧ _ , inputRef) = lookupInEnvironment Δ inputNode
+    let ⟦input⟧ = ∈.lookup ⟦inputs⟧ inputRef
+    tensorLookup ⟦input⟧ indices
+
+  ⟦outputVar⟧ : ∀ {τ} → OutputElementVariable Γ τ → ⟦constant⟧ τ
+  ⟦outputVar⟧ (elementVar _ outputNode indices) = do
+    let (_ , _ , variableValues _ ⟦outputs⟧ , outputRef) = lookupInEnvironment Δ outputNode
+    let outputTensor = ∈.lookup ⟦outputs⟧ outputRef
+    tensorLookup outputTensor indices
+
+  -----------------------------
+  -- Arithemetic expressions --
+  -----------------------------
+  
+  mutual
+    ⟦arithExpr⟧ : ArithExpr Γ τ → ⟦constant⟧ τ
+    ⟦arithExpr⟧ (constant  a)  = ⟦theoryTensor⟧ a
+    ⟦arithExpr⟧ (inputVar  v)  = ⟦inputVar⟧ v
+    ⟦arithExpr⟧ (outputVar v)  = ⟦outputVar⟧ v
+    ⟦arithExpr⟧ (negate    e)  = ⟦neg⟧ (⟦arithExpr⟧ e)
+    ⟦arithExpr⟧ (add (e ∷ es)) = ⟦arithExprList⟧ ⟦add⟧ (⟦arithExpr⟧ e) es
+    ⟦arithExpr⟧ (mul (e ∷ es)) = ⟦arithExprList⟧ ⟦mul⟧ (⟦arithExpr⟧ e) es
+    ⟦arithExpr⟧ (sub (e ∷ es)) = ⟦neg⟧ (⟦arithExprList⟧ ⟦add⟧ (⟦neg⟧ (⟦arithExpr⟧ e)) es)
+
+    ⟦arithExprList⟧ : ∀ {τ} → Op₂ (⟦constant⟧ τ) → ⟦constant⟧ τ → List (ArithExpr Γ τ) → ⟦constant⟧ τ
+    ⟦arithExprList⟧ op e []       = e
+    ⟦arithExprList⟧ op e (x ∷ xs) = op (⟦arithExpr⟧ x) (⟦arithExprList⟧ op e xs)
+
+  ⟦compExpr⟧ : ∀ {τ} → CompExpr Γ τ → Bool
+  ⟦compExpr⟧ (greaterThan  e₁ e₂) = ⟦>⟧ (⟦arithExpr⟧ e₁) (⟦arithExpr⟧ e₂)
+  ⟦compExpr⟧ (lessThan     e₁ e₂) = ⟦<⟧ (⟦arithExpr⟧ e₁) (⟦arithExpr⟧ e₂)
+  ⟦compExpr⟧ (greaterEqual e₁ e₂) = ⟦≥⟧ (⟦arithExpr⟧ e₁) (⟦arithExpr⟧ e₂)
+  ⟦compExpr⟧ (lessEqual    e₁ e₂) = ⟦<⟧ (⟦arithExpr⟧ e₁) (⟦arithExpr⟧ e₂)
+  ⟦compExpr⟧ (notEqual     e₁ e₂) = ⟦≠⟧ (⟦arithExpr⟧ e₁) (⟦arithExpr⟧ e₂)
+  ⟦compExpr⟧ (equal        e₁ e₂) = ⟦=⟧ (⟦arithExpr⟧ e₁) (⟦arithExpr⟧ e₂)
+
+  -------------------------
+  -- Boolean expressions --
+  -------------------------
+
+  mutual  
+    ⟦boolExpr⟧ : BoolExpr Γ → Bool
+    ⟦boolExpr⟧ (literal  b)        = b
+    ⟦boolExpr⟧ (andExpr (b ∷ bs))  = ⟦boolExprList⟧ _∧_ (⟦boolExpr⟧ b) bs
+    ⟦boolExpr⟧ (orExpr  (b ∷ bs))  = ⟦boolExprList⟧ _∨_ (⟦boolExpr⟧ b) bs
+    ⟦boolExpr⟧ (compExpr (τ , e))  = ⟦compExpr⟧ e
+
+    ⟦boolExprList⟧ : Op₂ Bool → Bool → List (BoolExpr Γ) → Bool
+    ⟦boolExprList⟧ op e []       = e
+    ⟦boolExprList⟧ op e (x ∷ xs) = op (⟦boolExpr⟧ x) (⟦boolExprList⟧ op e xs)
+
+  ----------------
+  -- Assertions --
+  ----------------
+  
+  ⟦assertion⟧ : Assertion Γ → Bool
+  ⟦assertion⟧ (assert p) = ⟦boolExpr⟧ p
+
+  ⟦assertionList⟧ : List (Assertion Γ) → Bool
+  ⟦assertionList⟧ ps = and (List.map ⟦assertion⟧ ps)
+
+-------------
+-- Queries --
+-------------
+
+QuerySemantics : Set₁
+QuerySemantics = (q : Query) → NetworkImplementations (context q) → Set
+
+⟦query⟧ : QuerySemantics
+⟦query⟧ (query Γ assertions) networks =
+  ∃ λ (assignment : NetworkInputAssignments Γ) →
+    let Δ = createEnvironment networks assignment in
+    True (⟦assertionList⟧ Δ assertions)
