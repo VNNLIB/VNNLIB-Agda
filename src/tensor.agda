@@ -17,6 +17,8 @@ data TensorIndices : TensorShape → Set where
  empty : TensorIndices []
  non-empty : {head : ℕ} → {tail : List ℕ} → Fin head →  TensorIndices tail → TensorIndices (head ∷ tail) 
 
+-- This representation of a tensor is taken from the `Mat` data structure by
+-- Alexis King in https://gist.github.com/lexi-lambda/5bec3f33b1db4269fc129242b53b5f43#file-matrix-agda
 data Tensor (Σ : Set) : TensorShape → Set where
   scalar : Σ → Tensor Σ []
   vector : {head : ℕ} → {tail : List ℕ} → Vec (Tensor Σ tail) head → Tensor Σ (head ∷ tail)
