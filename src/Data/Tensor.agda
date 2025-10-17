@@ -1,11 +1,10 @@
-module tensor where
+module Data.Tensor where
 
 open import Data.Nat as ℕ
 open import Data.Fin as Fin
 open import Data.List as List
 open import Data.Vec as Vec using (Vec; []; _∷_)
 open import Data.Rational as ℚ
-open import vnnlib-types
 
 
 -- Tensor
@@ -29,28 +28,30 @@ tensorLookup {[]} empty (scalar x) = x
 tensorLookup {dim ∷ shape} (non-empty idx idxs) (vector x) = tensorLookup idxs (Vec.lookup x idx)
 
 
+
 -- Example usage
-testSide₁ : Tensor ℚ (2 ∷ 2 ∷ [])
-testSide₁ = vector (vector (scalar 1ℚ ∷ scalar 1ℚ ∷ []) ∷
-                 vector (scalar 1ℚ ∷ scalar 1ℚ ∷ []) ∷ [])
+private
+  testSide₁ : Tensor ℚ (2 ∷ 2 ∷ [])
+  testSide₁ = vector (vector (scalar 1ℚ ∷ scalar 1ℚ ∷ []) ∷
+                   vector (scalar 1ℚ ∷ scalar 1ℚ ∷ []) ∷ [])
 
-testSide₂ : Tensor ℚ (2 ∷ 2 ∷ [])
-testSide₂ = vector (vector (scalar 1ℚ ∷ scalar 1ℚ ∷ []) ∷
-                 vector (scalar 1ℚ ∷ scalar 1ℚ ∷ []) ∷ [])
+  testSide₂ : Tensor ℚ (2 ∷ 2 ∷ [])
+  testSide₂ = vector (vector (scalar 1ℚ ∷ scalar 1ℚ ∷ []) ∷
+                   vector (scalar 1ℚ ∷ scalar 1ℚ ∷ []) ∷ [])
 
-testTensor : Tensor ℚ (2 ∷ 2 ∷ 2 ∷ [])
-testTensor = vector (testSide₁ ∷ testSide₂ ∷ [])
+  testTensor : Tensor ℚ (2 ∷ 2 ∷ 2 ∷ [])
+  testTensor = vector (testSide₁ ∷ testSide₂ ∷ [])
 
-testIndex : TensorIndices (2 ∷ 2 ∷ 2 ∷ [])
-testIndex = non-empty (# 1) (non-empty (# 1) (non-empty ((# 1)) empty))
+  testIndex : TensorIndices (2 ∷ 2 ∷ 2 ∷ [])
+  testIndex = non-empty (# 1) (non-empty (# 1) (non-empty ((# 1)) empty))
 
-testElement : ℚ
-testElement = tensorLookup testIndex testTensor
+  testElement : ℚ
+  testElement = tensorLookup testIndex testTensor
 
--- Scalar
+  -- Scalar
 
-testTensorₛ : Tensor ℚ []
-testTensorₛ = scalar 1ℚ
+  testTensorₛ : Tensor ℚ []
+  testTensorₛ = scalar 1ℚ
 
-testIndex₁ : TensorIndices []
-testIndex₁ = empty
+  testIndex₁ : TensorIndices []
+  testIndex₁ = empty

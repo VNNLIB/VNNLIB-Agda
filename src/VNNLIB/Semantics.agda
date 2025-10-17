@@ -1,18 +1,20 @@
-module vnnlib-semantics where
+module VNNLIB.Semantics where
 
-open import Data.List as List
-open import Data.String hiding (map)
-open import Data.Rational as ℚ
-open import Data.Bool
-open import Data.Fin as Fin
-open import Data.Product as Product
+open import Data.Bool.ListAction using (and)
+open import Data.List.Base as List hiding (and)
+open import Data.String.Base hiding (map)
+open import Data.Rational.Base as ℚ
+open import Data.Bool.Base
+open import Data.Fin.Base as Fin
+open import Data.Product.Base as Product
 open import Relation.Binary.PropositionalEquality as Eq using (_≡_)
 open import Agda.Builtin.Float
 
-open import utils
-open import vnnlib-types
-open import vnnlib-syntax
-open import tensor
+open import Data.RationalUtils as Real
+open import Data.FloatUtils as Float64
+open import VNNLIB.Types
+open import VNNLIB.Syntax
+open import Data.Tensor
 
 private
   variable

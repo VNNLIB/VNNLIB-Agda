@@ -1,4 +1,4 @@
-module vnnlib-context-isomorphism where
+module VNNLIB.TypeCheck.ContextLemmas where
 
 open import Data.Nat as ℕ
 open import Data.List as List
@@ -6,8 +6,9 @@ open import Data.Fin
 open import Relation.Binary.PropositionalEquality as Eq using (_≡_; refl; sym; module ≡-Reasoning; cong)
 open Eq.≡-Reasoning
 open import Data.List.Properties using (length-map)
-open import vnnlib-syntax
-open import syntax-utils
+open import VNNLIB.Syntax
+open import Data.RationalUtils
+open import Data.FloatUtils
 
 lookup-map : {A B : Set} → (f : A → B) → (xs : List A) → (i : Fin (length xs)) → lookup (map f xs) (cast (sym (length-map f xs)) i) ≡ f (lookup xs i)
 lookup-map f (x ∷ a) zero = refl

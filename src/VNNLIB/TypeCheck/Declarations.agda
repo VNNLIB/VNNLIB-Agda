@@ -1,4 +1,4 @@
-module vnnlib-check-declarations where
+module VNNLIB.TypeCheck.Declarations where
 
 open import Data.List as List
 open import Data.List.Properties using (length-map)
@@ -8,8 +8,8 @@ open import Data.String as String using (String; _==_)
 open import Relation.Binary.PropositionalEquality
 open import Data.Fin as Fin
 open import Data.Nat as ℕ
-open import vnnlib-syntax as 𝐕
-open import Syntax.AST as 𝐁 hiding (String)
+open import VNNLIB.Syntax as 𝐕
+open import VNNLIB.Syntax.AST as 𝐁 hiding (String)
 open import Data.List.Relation.Unary.Any as RUAny
 open import Relation.Nullary
 open import Data.Nat.Show
@@ -17,10 +17,11 @@ open import Data.Maybe using (Maybe;just;nothing)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Product
 
-open import tensor as 𝐓 using (TensorShape)
-open import syntax-utils
-open import utils
-open import vnnlib-types as 𝐄
+open import Data.Tensor as 𝐓 using (TensorShape)
+open import VNNLIB.SyntaxUtils
+open import Data.RationalUtils
+open import Data.FloatUtils
+open import VNNLIB.Types as 𝐄
 
 open import Level
 open import Data.Sum.Effectful.Left String 0ℓ renaming (Sumₗ to Result)

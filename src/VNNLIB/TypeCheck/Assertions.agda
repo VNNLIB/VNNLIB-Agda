@@ -1,7 +1,8 @@
-open import vnnlib-syntax as 𝐕
+open import VNNLIB.Syntax as 𝐕
 open import Data.List as List
-open import vnnlib-check-declarations
-module vnnlib-check-assertions (Σ : List 𝐕.NetworkDefinition) where
+open import VNNLIB.TypeCheck.Declarations
+
+module VNNLIB.TypeCheck.Assertions (Σ : List 𝐕.NetworkDefinition) where
 
 open import Data.Nat as ℕ
 open import Data.Product as Product using (proj₁; proj₂; _,_; _×_)
@@ -26,12 +27,13 @@ open import Data.Empty using (⊥)
 open import Data.Unit.Base using (⊤;tt)
 open import Relation.Binary.Definitions using (Decidable; DecidableEquality)
 
-open import Syntax.AST as 𝐁 hiding (String)
-open import vnnlib-types as 𝐄
-open import syntax-utils
-open import utils
-open import tensor as 𝐓
-open import vnnlib-context-isomorphism
+open import VNNLIB.Syntax.AST as 𝐁 hiding (String)
+open import VNNLIB.Types as 𝐄
+open import VNNLIB.SyntaxUtils
+open import Data.RationalUtils
+open import Data.FloatUtils
+open import Data.Tensor as 𝐓
+open import VNNLIB.TypeCheck.ContextLemmas
 
 open import Level
 open import Data.Sum.Effectful.Left String 0ℓ renaming (Sumₗ to Result)
