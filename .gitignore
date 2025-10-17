@@ -1,5 +1,5 @@
 src/MAlonzo/**
 _build/**
-src/Syntax/**
+src/VNNLIB/Syntax/**
 Main
-src/Syntax/Main.agda
+src/**/*.agda~

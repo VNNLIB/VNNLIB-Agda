@@ -1,18 +1,19 @@
 module Main where
-open import Syntax.IOLib
-open import Syntax.Parser using (Err; parseQuery)
+
+open import VNNLIB.Syntax.IOLib
+open import VNNLIB.Syntax.Parser using (Err; parseQuery)
 
 open import Reflection.AST.Show using (showTerm)
-open import vnnlib-check using (check)
+open import VNNLIB.TypeCheck using (check)
 open import Level using (0ℓ)
 open import Data.Sum.Effectful.Left String 0ℓ renaming (Sumₗ to Result)
 open import Data.Sum.Base renaming (inj₁ to error; inj₂ to success)
 open import Reflection.AST
 open import Agda.Builtin.Reflection
 
-open import vnnlib-semantics
-open import vnnlib-types
-open import vnnlib-syntax using (Query)
+open import VNNLIB.Semantics
+open import VNNLIB.Types
+open import VNNLIB.Syntax using (Query)
 
 -- This only prints if there is an error or if the semantics has been computed
 printQuery : Result Query → IO ⊤

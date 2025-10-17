@@ -1,4 +1,4 @@
-module syntax-utils where
+module VNNLIB.SyntaxUtils where
 
 open import Data.List as List
 open import Data.List.NonEmpty as List⁺
@@ -12,11 +12,10 @@ open import Data.Rational using (ℚ ; -_; ↧ₙ_; ↥_)
 open import Agda.Builtin.Float
 open import Data.Nat.Show as ℕshow using (show)
 
-open import Syntax.AST as 𝐁 hiding (String)
-open import vnnlib-syntax as 𝐕
-open import vnnlib-types as 𝐄
-open import utils
-open import tensor as 𝐓
+open import VNNLIB.Syntax.AST as 𝐁 hiding (String)
+open import VNNLIB.Syntax as 𝐕
+open import VNNLIB.Types as 𝐄
+open import Data.Tensor as 𝐓
 
 -- convert the BNFC VariableName to agda string type
 ⟦_⟧asString : 𝐁.VariableName → String

@@ -1,47 +1,27 @@
-module utils where
+module Data.FloatUtils where
 
 open import Data.Bool using (Bool; not; _∧_;_∨_)
+open import Agda.Builtin.Float
 
-module Real where
-  open import Data.Rational using (ℚ;_≤ᵇ_)
-  infix 4 _≥ᵇ_ _>ᵇ_ _<ᵇ_ _=ᵇ_ _≠ᵇ_
-  
-  _≥ᵇ_ : ℚ → ℚ → Bool
-  p ≥ᵇ q = q ≤ᵇ p
-  
-  _>ᵇ_ : ℚ → ℚ → Bool
-  p >ᵇ q = not (p ≤ᵇ q)
-  
-  _<ᵇ_ : ℚ → ℚ → Bool
-  p <ᵇ q = not (q ≤ᵇ p)
-  
-  _=ᵇ_ : ℚ → ℚ → Bool
-  p =ᵇ q = (q ≤ᵇ p) ∧ (p ≤ᵇ q)
-  
-  _≠ᵇ_ : ℚ → ℚ → Bool
-  p ≠ᵇ q = not ((q ≤ᵇ p) ∧ (p ≤ᵇ q))
+infix 4 _≥ᵇ_ _>ᵇ_ _<ᵇ_ _=ᵇ_ _≠ᵇ_ _≤ᵇ_
 
-module Float64 where
-  open import Agda.Builtin.Float
-  infix 4 _≥ᵇ_ _>ᵇ_ _<ᵇ_ _=ᵇ_ _≠ᵇ_ _≤ᵇ_
+_=ᵇ_ : Float → Float → Bool
+p =ᵇ q = primFloatEquality p q
 
-  _=ᵇ_ : Float → Float → Bool
-  p =ᵇ q = primFloatEquality p q
-  
-  _≠ᵇ_ : Float → Float → Bool
-  p ≠ᵇ q = primFloatInequality p q
+_≠ᵇ_ : Float → Float → Bool
+p ≠ᵇ q = primFloatInequality p q
 
-  _<ᵇ_ : Float → Float → Bool
-  p <ᵇ q = primFloatLess p q
+_<ᵇ_ : Float → Float → Bool
+p <ᵇ q = primFloatLess p q
 
-  _≤ᵇ_ : Float → Float → Bool
-  p ≤ᵇ q = (p <ᵇ q) ∨ (p =ᵇ q) 
-  
-  _≥ᵇ_ : Float → Float → Bool
-  p ≥ᵇ q = not (p <ᵇ q)
-  
-  _>ᵇ_ : Float → Float → Bool
-  p >ᵇ q = q <ᵇ p
+_≤ᵇ_ : Float → Float → Bool
+p ≤ᵇ q = (p <ᵇ q) ∨ (p =ᵇ q) 
+
+_≥ᵇ_ : Float → Float → Bool
+p ≥ᵇ q = not (p <ᵇ q)
+
+_>ᵇ_ : Float → Float → Bool
+p >ᵇ q = q <ᵇ p
  
 
 

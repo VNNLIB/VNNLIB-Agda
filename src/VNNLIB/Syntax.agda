@@ -1,4 +1,4 @@
-module vnnlib-syntax where
+module VNNLIB.Syntax where
 
 open import Data.List as List using (List; map)
 open import Data.String using (String)
@@ -7,9 +7,9 @@ open import Data.Vec as Vec using (Vec; []; _∷_)
 open import Data.Bool using (Bool)
 open import Data.Product using (Σ; _×_; _,_)
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.Tensor using (TensorShape; TensorIndices)
 
-open import vnnlib-types using (ElementType; ElementTypeToSet)
-open import tensor using (TensorShape; TensorIndices)
+open import VNNLIB.Types using (ElementType; ElementTypeToSet)
 
 -- Variables
 --  -- Naming/referencing
@@ -29,9 +29,6 @@ record NetworkType : Set where
 -- Node Definitions
 data InputDefinition : Set where
   declareInput : VariableName → ElementType → TensorShape → InputDefinition
-
--- data IntermediateDefinition : Set where
-  -- declareIntermediate : VariableName → ElementType → TensorShape → String → IntermediateDefinition
 
 data OutputDefinition : Set where
   declareOutput : VariableName → ElementType → TensorShape → OutputDefinition

@@ -1,4 +1,4 @@
-module vnnlib-types where
+module VNNLIB.Types where
 
 open import Data.Rational as ℚ
 open import Data.Bool

@@ -1,15 +1,16 @@
-module vnnlib-check where
+module VNNLIB.TypeCheck where
 
 open import Data.String as String using (String)
 open import Data.List as List
 open import Data.List.NonEmpty as List⁺
-open import Syntax.AST as 𝐁 hiding (String)
+open import VNNLIB.Syntax.AST as 𝐁 hiding (String)
 
-open import vnnlib-syntax as 𝐕
-open import syntax-utils
-open import utils
-open import vnnlib-check-declarations
-open import vnnlib-check-assertions
+open import VNNLIB.Syntax as 𝐕
+open import VNNLIB.SyntaxUtils
+open import Data.RationalUtils
+open import Data.FloatUtils
+open import VNNLIB.TypeCheck.Declarations
+open import VNNLIB.TypeCheck.Assertions
 
 open import Level
 open import Data.Sum.Effectful.Left String 0ℓ renaming (Sumₗ to Result)
