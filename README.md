@@ -1,10 +1,16 @@
 # VNNLIB-Agda
 
-This repository is a formalisation of the [VNN-LIB standard](https://github.com/VNNLIB/VNNLIB-Standard/).
+This repository is the official Agda library for interacting with the [VNN-LIB standard](https://www.vnnlib.org/).
 It includes:
 - Syntax for well-typed VNNLIB queries
 - A parser and type-checker for VNNLIB queries
 - Formal semantics for VNNLIB queries
+
+## Version compatability
+
+| VNNLIB-Agda version | VNNLIB version |
+| --- | --- |
+| v1.0 | v2.0 |
 
 ## Requirements
 
