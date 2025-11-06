@@ -96,17 +96,17 @@ mutual
   -- Restrictions on network variables --
   ---------------------------------------
  
-  Restriction : Set₁
-  Restriction = IPred NetworkDeclaration 0ℓ
+  NetworkPredicate : Set₁
+  NetworkPredicate = IPred NetworkDeclaration 0ℓ
 
-  postulate ValidEqualToTarget : Restriction
+  postulate ValidEqualToTarget : NetworkPredicate
 
-  postulate ValidIsomorphicToTarget : Restriction
+  postulate ValidIsomorphicToTarget : NetworkPredicate
 
-  HasInputMatching : TensorType TheoryType → Restriction
+  HasInputMatching : TensorType TheoryType → NetworkPredicate
   HasInputMatching type network = type ∈ typeOfInputs network
 
-  HasOutputMatching : TensorType TheoryType → Restriction
+  HasOutputMatching : TensorType TheoryType → NetworkPredicate
   HasOutputMatching type network = type ∈ typeOfOutputs network
 
   -----------------------
@@ -114,17 +114,22 @@ mutual
   -----------------------
 
   -- A reference to a network in the context that satisfies some property P
-  data AbstractVariable (P : Restriction) : NetworkContext → Set where
-    here : ∀ {ns n} → P n → AbstractVariable P (ns ∷ n)
-    there : ∀ {ns n} → AbstractVariable P ns → AbstractVariable P (ns ∷ n)
+  data AnyNetwork (P : NetworkPredicate) : NetworkContext → Set where
+    here : ∀ {ns n} → P n → AnyNetwork P (ns ∷ n)
+    there : ∀ {ns n} → AnyNetwork P ns → AnyNetwork P (ns ∷ n)
+
+  -- Associates every declared network `d` in the context with some dependent value of type `P d`
+  data AllNetworks (P : NetworkPredicate) : NetworkContext → Set where
+    [] : AllNetworks P []
+    _∷_ : ∀ {Γ d} (Δ : AllNetworks P Γ) (Δₙ : P d) → AllNetworks P (Γ ∷ d)
 
   -- A reference to a network that is equal to the current network
   EqualNetworkVariable : NetworkContext → Set
-  EqualNetworkVariable = AbstractVariable ValidEqualToTarget
+  EqualNetworkVariable = AnyNetwork ValidEqualToTarget
 
   -- A reference to a network that is isomorphic to the current network
   IsomorphicNetworkVariable : NetworkContext → Set
-  IsomorphicNetworkVariable = AbstractVariable ValidIsomorphicToTarget
+  IsomorphicNetworkVariable = AnyNetwork ValidIsomorphicToTarget
 
 open NetworkDeclaration public
 
@@ -143,10 +148,10 @@ NodeVariableSort : Set₁
 NodeVariableSort = NetworkContext → TensorType TheoryType → Set
 
 InputVariable : NodeVariableSort
-InputVariable Γ sig = AbstractVariable (HasInputMatching sig) Γ
+InputVariable Γ sig = AnyNetwork (HasInputMatching sig) Γ
 
 OutputVariable : NodeVariableSort
-OutputVariable Γ sig = AbstractVariable (HasOutputMatching sig) Γ
+OutputVariable Γ sig = AnyNetwork (HasOutputMatching sig) Γ
 
 -----------------------
 -- Element variables --

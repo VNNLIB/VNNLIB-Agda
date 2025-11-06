@@ -118,13 +118,13 @@ module _
 lookupNameInInputs :
   ∀ {Γ} (n : NetworkDeclaration Γ) →
   B.VariableName →
-  Maybe (Σ (TensorType TheoryType) (λ τ → AbstractVariable (λ m → Any⁺.Any (λ a → inputType a ≡ τ) (networkInputs m)) (Γ ∷ n)))
+  Maybe (Σ (TensorType TheoryType) (λ τ → AnyNetwork (λ m → Any⁺.Any (λ a → inputType a ≡ τ) (networkInputs m)) (Γ ∷ n)))
 lookupNameInInputs {Γ} n name = Maybe.map (Product.map₂ here) (lookupNameInNonEmptyNodes inputName inputType (Γ ∷ n) (networkInputs n) name)
   
 lookupNameInOutputs :
   ∀ {Γ} (n : NetworkDeclaration Γ) →
   B.VariableName →
-  Maybe (Σ (TensorType TheoryType) (λ τ → AbstractVariable (λ n → Any⁺.Any (λ a → outputType a ≡ τ) (networkOutputs n)) (Γ ∷ n)))
+  Maybe (Σ (TensorType TheoryType) (λ τ → AnyNetwork (λ n → Any⁺.Any (λ a → outputType a ≡ τ) (networkOutputs n)) (Γ ∷ n)))
 lookupNameInOutputs {Γ} n name = Maybe.map (Product.map₂ here) (lookupNameInNonEmptyNodes outputName outputType (Γ ∷ n) (networkOutputs n) name)
 
 lookupTensorVariableInNetwork : ∀ {Γ} (n : NetworkDeclaration Γ) → B.VariableName → Maybe (TensorVarResult (Γ ∷ n))

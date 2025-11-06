@@ -42,20 +42,15 @@ private
 -- Abstract environments --
 ---------------------------
 
--- Associates every declared network `d` in the context with some dependent value of type `P d`
-data AbstractEnvironment (P : Restriction) : NetworkContext → Set where
-  [] : AbstractEnvironment P []
-  _∷_ : ∀ {Γ d} (Δ : AbstractEnvironment P Γ) (Δₙ : P d) → AbstractEnvironment P (Γ ∷ d)
-
-mapEnvironment : {P Q : Restriction} → (∀ {Γ} {d : NetworkDeclaration Γ} → P d → Q d) → AbstractEnvironment P Γ → AbstractEnvironment Q Γ
+mapEnvironment : {P Q : NetworkPredicate} → (∀ {Γ} {d : NetworkDeclaration Γ} → P d → Q d) → AllNetworks P Γ → AllNetworks Q Γ
 mapEnvironment f []       = []
 mapEnvironment f (Δ ∷ Δₙ) = mapEnvironment f Δ ∷ f Δₙ
 
-zipEnvironment : {P Q R : Restriction} → (∀ {Γ} {d : NetworkDeclaration Γ} → P d → Q d → R d) → AbstractEnvironment P Γ → AbstractEnvironment Q Γ → AbstractEnvironment R Γ
+zipEnvironment : {P Q R : NetworkPredicate} → (∀ {Γ} {d : NetworkDeclaration Γ} → P d → Q d → R d) → AllNetworks P Γ → AllNetworks Q Γ → AllNetworks R Γ
 zipEnvironment f [] []       = []
 zipEnvironment f (Δ₁ ∷ Δ₁ₙ) (Δ₂ ∷ Δ₂ₙ) = zipEnvironment f Δ₁ Δ₂ ∷ f Δ₁ₙ Δ₂ₙ
 
-lookupInEnvironment : {P Q : Restriction} → AbstractEnvironment P Γ → AbstractVariable Q Γ → Σ NetworkContext (λ Γ' → Σ (NetworkDeclaration Γ') (λ n → P n × Q n))
+lookupInEnvironment : {P Q : NetworkPredicate} → AllNetworks P Γ → AnyNetwork Q Γ → Σ NetworkContext (λ Γ' → Σ (NetworkDeclaration Γ') (λ n → P n × Q n))
 lookupInEnvironment (Δ ∷ Δₙ) (here Px)    = _ , _ , Δₙ , Px
 lookupInEnvironment (Δ ∷ Δₙ) (there Pxs) = lookupInEnvironment Δ Pxs
 
@@ -63,21 +58,21 @@ lookupInEnvironment (Δ ∷ Δₙ) (there Pxs) = lookupInEnvironment Δ Pxs
 -- Runtime networks --
 ----------------------
 
-NetworkImplementation : Restriction
+NetworkImplementation : NetworkPredicate
 NetworkImplementation d = TheoryNetwork (typeOfNetwork d)
 
 NetworkImplementations : NetworkContext → Set
-NetworkImplementations = AbstractEnvironment NetworkImplementation
+NetworkImplementations = AllNetworks NetworkImplementation
 
 -----------------------
 -- Input assignments --
 -----------------------
 
-NetworkInputAssignment : Restriction
+NetworkInputAssignment : NetworkPredicate
 NetworkInputAssignment d = All⁺ TheoryTensor (typeOfInputs d)
 
 NetworkInputAssignments : NetworkContext → Set
-NetworkInputAssignments = AbstractEnvironment NetworkInputAssignment
+NetworkInputAssignments = AllNetworks NetworkInputAssignment
 
 -----------------
 -- Environment --
@@ -97,7 +92,7 @@ createNetworkVariableValues network inputs = do
   variableValues ⟦inputs⟧ ⟦outputs⟧
 
 Environment : NetworkContext → Set
-Environment = AbstractEnvironment NetworkVariableValues
+Environment = AllNetworks NetworkVariableValues
 
 createEnvironment : NetworkImplementations Γ → NetworkInputAssignments Γ → Environment Γ
 createEnvironment = zipEnvironment createNetworkVariableValues
