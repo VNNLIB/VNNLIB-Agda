@@ -6,7 +6,7 @@ module VNNLIB.TypeCheck
   (theoryParser : NetworkTheoryParser theorySyntax)
   where
 
-open import Data.List as List
+open import Data.List as List using (List; []; _∷_)
 open import Data.List.Properties using (length-map)
 open import Data.List.NonEmpty as List⁺
 open import Data.Bool as Bool
@@ -33,9 +33,11 @@ open import Data.Tensor as 𝐓
 open import Data.RationalUtils
 open import Data.FloatUtils
 import Data.List.NonEmpty.Relation.Unary.Any as Any⁺
+import Data.List.NonEmpty.Membership.Propositional as Any⁺
 open import Data.ReadUtils
 
 import VNNLIB.Syntax.AST as B hiding (String)
+import VNNLIB.Syntax.Parser as B using (parseQuery; Err)
 open import VNNLIB.Syntax theorySyntax
 open import VNNLIB.TypeCheck.Monad
 
@@ -98,7 +100,7 @@ module _
   lookupNameInNodes :
     (xs : List A)
     (name : B.VariableName) →
-    Maybe (Σ (TensorType TheoryType) (λ τ → Any (λ a → getType a ≡ τ) xs))
+    Maybe (Σ (TensorType TheoryType) (_∈ List.map getType xs))
   lookupNameInNodes [] name = nothing
   lookupNameInNodes (x ∷ xs) name =
     if getName x String.== getVariableName name
@@ -109,7 +111,7 @@ module _
     ∀ (Γ : NetworkContext) → 
     (xs : List⁺ A)
     (name : B.VariableName) →
-    Maybe (Σ (TensorType TheoryType) (λ τ → (λ n → Any⁺.Any (λ a → getType a ≡ τ) xs) Γ))
+    Maybe (Σ (TensorType TheoryType) (Any⁺._∈ List⁺.map getType xs))
   lookupNameInNonEmptyNodes Γ (x ∷ xs) name =
     if getName x String.== getVariableName name
       then just (getType x , Any⁺.here refl)
@@ -118,13 +120,13 @@ module _
 lookupNameInInputs :
   ∀ {Γ} (n : NetworkDeclaration Γ) →
   B.VariableName →
-  Maybe (Σ (TensorType TheoryType) (λ τ → AnyNetwork (λ m → Any⁺.Any (λ a → inputType a ≡ τ) (networkInputs m)) (Γ ∷ n)))
+  Maybe (Σ (TensorType TheoryType) (InputVariable (Γ ∷ n)))
 lookupNameInInputs {Γ} n name = Maybe.map (Product.map₂ here) (lookupNameInNonEmptyNodes inputName inputType (Γ ∷ n) (networkInputs n) name)
   
 lookupNameInOutputs :
   ∀ {Γ} (n : NetworkDeclaration Γ) →
   B.VariableName →
-  Maybe (Σ (TensorType TheoryType) (λ τ → AnyNetwork (λ n → Any⁺.Any (λ a → outputType a ≡ τ) (networkOutputs n)) (Γ ∷ n)))
+  Maybe (Σ (TensorType TheoryType) (OutputVariable (Γ ∷ n)))
 lookupNameInOutputs {Γ} n name = Maybe.map (Product.map₂ here) (lookupNameInNonEmptyNodes outputName outputType (Γ ∷ n) (networkOutputs n) name)
 
 lookupTensorVariableInNetwork : ∀ {Γ} (n : NetworkDeclaration Γ) → B.VariableName → Maybe (TensorVarResult (Γ ∷ n))
@@ -304,14 +306,14 @@ module _ (Γ : NetworkContext) where
 
   mutual
     checkBoolExpr : B.BoolExpr → TCM (BoolExpr Γ)
-    checkBoolExpr (B.greaterThan  e₁ e₂) = compExpr <$> checkComparison greaterThan  e₁ e₂
-    checkBoolExpr (B.lessThan     e₁ e₂) = compExpr <$> checkComparison lessThan     e₁ e₂
-    checkBoolExpr (B.greaterEqual e₁ e₂) = compExpr <$> checkComparison greaterEqual e₁ e₂
-    checkBoolExpr (B.lessEqual    e₁ e₂) = compExpr <$> checkComparison lessEqual    e₁ e₂
-    checkBoolExpr (B.notEqual     e₁ e₂) = compExpr <$> checkComparison notEqual     e₁ e₂
-    checkBoolExpr (B.equal        e₁ e₂) = compExpr <$> checkComparison equal        e₁ e₂
-    checkBoolExpr (B.and es)    = andExpr  <$> checkList⁺BoolExpr es
-    checkBoolExpr (B.or  es)    = orExpr   <$> checkList⁺BoolExpr  es
+    checkBoolExpr (B.greaterThan  e₁ e₂) = comparison <$> checkComparison greaterThan  e₁ e₂
+    checkBoolExpr (B.lessThan     e₁ e₂) = comparison <$> checkComparison lessThan     e₁ e₂
+    checkBoolExpr (B.greaterEqual e₁ e₂) = comparison <$> checkComparison greaterEqual e₁ e₂
+    checkBoolExpr (B.lessEqual    e₁ e₂) = comparison <$> checkComparison lessEqual    e₁ e₂
+    checkBoolExpr (B.notEqual     e₁ e₂) = comparison <$> checkComparison notEqual     e₁ e₂
+    checkBoolExpr (B.equal        e₁ e₂) = comparison <$> checkComparison equal        e₁ e₂
+    checkBoolExpr (B.and es)    = and  <$> checkList⁺BoolExpr es
+    checkBoolExpr (B.or  es)    = or   <$> checkList⁺BoolExpr  es
     
     checkList⁺BoolExpr : List B.BoolExpr → TCM (List⁺ (BoolExpr Γ))
     checkList⁺BoolExpr [] = throw "Boolean operators must have at least one argument"
@@ -342,3 +344,8 @@ checkQuery (B.vNNLibQuery ver networks assertions) = do
   networks' ← checkNetworks networks
   assertions' ← checkAssertions networks' assertions
   return (query networks' assertions')
+
+parseQuery : String → String ⊎ Query
+parseQuery queryStr with B.parseQuery queryStr
+... | B.Err.bad err = inj₁ (String.fromList err)
+... | B.Err.ok untypedAST = checkQuery untypedAST

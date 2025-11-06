@@ -7,7 +7,7 @@ module VNNLIB.Semantics
   where
 
 open import Algebra.Core using (Op₂)
-open import Data.Bool.ListAction using (and)
+open import Data.Bool.ListAction as ListAction using (and)
 open import Data.List.Base as List hiding (and)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.NonEmpty as List⁺ using (List⁺; _∷_)
@@ -155,9 +155,9 @@ module _ {Γ : NetworkContext} (Δ : Environment Γ) where
   mutual  
     ⟦boolExpr⟧ : BoolExpr Γ → Bool
     ⟦boolExpr⟧ (literal  b)        = b
-    ⟦boolExpr⟧ (andExpr (b ∷ bs))  = ⟦boolExprList⟧ _∧_ (⟦boolExpr⟧ b) bs
-    ⟦boolExpr⟧ (orExpr  (b ∷ bs))  = ⟦boolExprList⟧ _∨_ (⟦boolExpr⟧ b) bs
-    ⟦boolExpr⟧ (compExpr (τ , e))  = ⟦compExpr⟧ e
+    ⟦boolExpr⟧ (and (b ∷ bs))  = ⟦boolExprList⟧ _∧_ (⟦boolExpr⟧ b) bs
+    ⟦boolExpr⟧ (or  (b ∷ bs))  = ⟦boolExprList⟧ _∨_ (⟦boolExpr⟧ b) bs
+    ⟦boolExpr⟧ (comparison (τ , e))  = ⟦compExpr⟧ e
 
     ⟦boolExprList⟧ : Op₂ Bool → Bool → List (BoolExpr Γ) → Bool
     ⟦boolExprList⟧ op e []       = e
@@ -171,7 +171,7 @@ module _ {Γ : NetworkContext} (Δ : Environment Γ) where
   ⟦assertion⟧ (assert p) = ⟦boolExpr⟧ p
 
   ⟦assertionList⟧ : List (Assertion Γ) → Bool
-  ⟦assertionList⟧ ps = and (List.map ⟦assertion⟧ ps)
+  ⟦assertionList⟧ ps = ListAction.and (List.map ⟦assertion⟧ ps)
 
 -------------
 -- Queries --

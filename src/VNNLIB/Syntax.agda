@@ -206,10 +206,10 @@ module _ (Γ : NetworkContext) where
   -------------------------
 
   data BoolExpr : Set where
-    literal  : Bool → BoolExpr
-    compExpr : Σ TheoryType CompExpr → BoolExpr
-    andExpr  : List⁺ BoolExpr → BoolExpr
-    orExpr   : List⁺ BoolExpr → BoolExpr
+    literal    : Bool → BoolExpr
+    comparison : Σ TheoryType CompExpr → BoolExpr
+    and        : List⁺ BoolExpr → BoolExpr
+    or         : List⁺ BoolExpr → BoolExpr
 
   ----------------
   -- Assertions --
