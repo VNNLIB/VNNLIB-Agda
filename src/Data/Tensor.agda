@@ -1,33 +1,45 @@
 module Data.Tensor where
 
+open import Data.Bool.Base
 open import Data.Nat as ℕ
 open import Data.Fin as Fin
 open import Data.List as List
 open import Data.Vec as Vec using (Vec; []; _∷_)
 open import Data.Rational as ℚ
+open import Data.List.Relation.Unary.All
+open import Level
 
-
+private
+  variable
+    a : Level
+    A B C : Set a
+    
 -- Tensor
 
 TensorShape : Set
 TensorShape = List ℕ
 
-data TensorIndices : TensorShape → Set where
- empty : TensorIndices []
- non-empty : {head : ℕ} → {tail : List ℕ} → Fin head →  TensorIndices tail → TensorIndices (head ∷ tail) 
+TensorIndices : TensorShape → Set
+TensorIndices shape = All Fin shape
+
+open All public
+  using ([]; _∷_)
 
 -- This representation of a tensor is taken from the `Mat` data structure by
 -- Alexis King in https://gist.github.com/lexi-lambda/5bec3f33b1db4269fc129242b53b5f43#file-matrix-agda
-data Tensor (Σ : Set) : TensorShape → Set where
-  scalar : Σ → Tensor Σ []
-  vector : {head : ℕ} → {tail : List ℕ} → Vec (Tensor Σ tail) head → Tensor Σ (head ∷ tail)
+data Tensor (A : Set) : TensorShape → Set where
+  scalar : A → Tensor A []
+  vector : {head : ℕ} {tail : List ℕ} → Vec (Tensor A tail) head → Tensor A (head ∷ tail)
 
+tensorLookup : ∀ {shape} {A : Set} → Tensor A shape → TensorIndices shape → Tensor A []
+tensorLookup x          []            = x
+tensorLookup (vector x) (idx ∷ idxs) = tensorLookup (Vec.lookup x idx) idxs
 
-tensorLookup : ∀ {shape} {A : Set} → TensorIndices shape → Tensor A shape → A
-tensorLookup {[]} empty (scalar x) = x
-tensorLookup {dim ∷ shape} (non-empty idx idxs) (vector x) = tensorLookup idxs (Vec.lookup x idx)
+postulate mapTensor : ∀ {shape} → (A → B) → Tensor A shape → Tensor B shape
 
+postulate zipTensor : ∀ {shape} → (A → B → C) → Tensor A shape → Tensor B shape → Tensor C shape
 
+postulate comparePointwise : (A → A → Bool) → ∀ {shape} → Tensor A shape → Tensor A shape → Bool
 
 -- Example usage
 private
@@ -43,10 +55,10 @@ private
   testTensor = vector (testSide₁ ∷ testSide₂ ∷ [])
 
   testIndex : TensorIndices (2 ∷ 2 ∷ 2 ∷ [])
-  testIndex = non-empty (# 1) (non-empty (# 1) (non-empty ((# 1)) empty))
+  testIndex = (# 1) ∷ ((# 1) ∷ ((# 1) ∷ []))
 
-  testElement : ℚ
-  testElement = tensorLookup testIndex testTensor
+  testElement : Tensor ℚ []
+  testElement = tensorLookup testTensor testIndex
 
   -- Scalar
 
@@ -54,4 +66,4 @@ private
   testTensorₛ = scalar 1ℚ
 
   testIndex₁ : TensorIndices []
-  testIndex₁ = empty
+  testIndex₁ = []

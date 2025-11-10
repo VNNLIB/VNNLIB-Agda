@@ -1,6 +1,6 @@
-module vnnlib-semantics-demo where
+module VNNLIB.Example where
 
-open import Data.String using (String; fromList)
+open import Data.String.Base using (String; fromList)
 open import Data.Nat
 open import Data.Bool
 open import Data.Product using (_,_)
@@ -17,14 +17,13 @@ open import Data.Sum.Effectful.Left String 0ℓ renaming (Sumₗ to Result)
 open import Data.Sum.Base renaming (inj₁ to error; inj₂ to success)
 open import Data.Empty using (⊥)
 
-open import Syntax.Parser using (Err; parseQuery)
-open import Syntax.AST as AST using (Query)
+open import VNNLIB.Syntax.Parser using (Err; parseQuery)
+open import VNNLIB.Syntax.AST as AST using (Query)
 
-open import tensor
-open import vnnlib-semantics
-open import vnnlib-types
-open import vnnlib-syntax as VNN
-open import vnnlib-check
+open import Data.Tensor
+open import VNNLIB.Semantics
+open import VNNLIB.Syntax as VNN
+open import VNNLIB.TypeCheck
 
 small_vcl_query : String
 small_vcl_query = " (vnnlib-version <2.0>)
@@ -47,7 +46,7 @@ small_vcl_query = " (vnnlib-version <2.0>)
 --    ∷
 --    assert (compExpr (real , lessEqual (constant 0ℚ) (varOutput zero (here refl) tensor.empty)))
 --    ∷ [])
-
+{-
 -- Expected semantics for the small_vcl_query
 𝕢 : Set
 𝕢 = (n
@@ -136,3 +135,4 @@ checkSemantics with checkedQuery
     comp = ⟦ y ⟧𝕢
     c : comp ≡ 𝕢
     c = {!!}
+-}
