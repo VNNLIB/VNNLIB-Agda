@@ -32,10 +32,10 @@ _∈_ {{interp}} q theory = Interpretation.interpretation interp theory q
 
 -- VariablePredicate
 ElementVariablePredicate : Set₁
-ElementVariablePredicate = ?
+ElementVariablePredicate = {!ElementVariabel!}
 
 -- A
-data AllAssertionVariables : ?
+data AllAssertionVariables : {!!}
 
 -- A predicate over assertions
 AssertionPredicate : Set₁
