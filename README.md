@@ -12,7 +12,7 @@ It includes:
 - `VNNLIB.Logics` - overall subsets of the query syntax
 - `VNNLIB.Solver` - an interface for solvers of VNNLIB queries
 
-## Version compatability
+## Version compatibility
 
 | VNNLIB-Agda version | VNNLIB version |
 | --- | --- |
