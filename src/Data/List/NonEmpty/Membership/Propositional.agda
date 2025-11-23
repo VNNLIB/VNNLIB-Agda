@@ -22,7 +22,7 @@ private
     p : Level
     P : Pred A p
     xs : List⁺ A
-    
+
 lookup : All P xs → ∀ {x} → x ∈ xs → P x
 lookup (px ∷ pxs) (here refl)   = px
 lookup (px ∷ pxs) (there x∈xs) = ListAll.lookup pxs x∈xs

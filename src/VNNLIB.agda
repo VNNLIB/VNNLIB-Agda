@@ -10,6 +10,8 @@ open import Data.Sum.Base
 
 open import VNNLIB.Syntax
 open import VNNLIB.Semantics
+open import VNNLIB.Parser
+open import VNNLIB.Theories
 
 ------------
 -- VNNLIB --

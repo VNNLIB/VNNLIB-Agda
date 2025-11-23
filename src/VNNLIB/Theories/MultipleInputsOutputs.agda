@@ -27,8 +27,8 @@ data MultipleInputsOutputs : Set where
 
 SingleInputOutput : NetworkPredicate
 SingleInputOutput network =
-  length (networkInputs network)  ≡ 1 ×
-  length (networkOutputs network) ≡ 1
+  length (inputDeclarations network)  ≡ 1 ×
+  length (outputDeclarations network) ≡ 1
 
 -- A query lives in the SIO theory 
 SingleInputsOutputsTheory : Theory

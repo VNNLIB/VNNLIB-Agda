@@ -1,7 +1,7 @@
 open import ONNX.Syntax
 open import ONNX.Parser
 
-module VNNLIB.TypeCheck
+module VNNLIB.Parser
   (theorySyntax : NetworkTheorySyntax)
   (theoryParser : NetworkTheoryParser theorySyntax)
   where
@@ -39,7 +39,7 @@ open import Data.ReadUtils
 import VNNLIB.Syntax.AST as B hiding (String)
 import VNNLIB.Syntax.Parser as B using (parseQuery; Err)
 open import VNNLIB.Syntax theorySyntax
-open import VNNLIB.TypeCheck.Monad
+open import VNNLIB.Parser.Monad
 
 open NetworkTheorySyntax theorySyntax
 private module Theory = NetworkTheoryParser theoryParser
@@ -86,21 +86,21 @@ showElementType B.elementTypeString     = "string"
 -------------
 
 liftNetwork : ∀ {Γ} (n : NetworkDeclaration Γ) → NetworkDeclaration Γ → NetworkDeclaration (Γ ∷ n)
-liftNetwork _ (declareNetwork name inputs outputs) = declareNetwork name inputs outputs
+liftNetwork _ (declareNetwork name inputs hidden outputs) = declareNetwork name inputs hidden outputs
 
 TensorVarResult : NetworkContext → Set
-TensorVarResult Γ = Σ (TensorType TheoryType) (λ τ → InputVariable Γ τ ⊎ OutputVariable Γ τ)
+TensorVarResult Γ = Σ (TensorType ElementType) (λ τ → InputVariable Γ τ ⊎ HiddenVariable Γ τ ⊎ OutputVariable Γ τ)
 
 module _
   {A : Set}
-  (getName : A → Name)
-  (getType : A → TensorType TheoryType)
+  (getType : A → TensorType ElementType)
+  (getName : A → String)
   where
 
   lookupNameInNodes :
     (xs : List A)
     (name : B.VariableName) →
-    Maybe (Σ (TensorType TheoryType) (_∈ List.map getType xs))
+    Maybe (Σ (TensorType ElementType) (_∈ List.map getType xs))
   lookupNameInNodes [] name = nothing
   lookupNameInNodes (x ∷ xs) name =
     if getName x String.== getVariableName name
@@ -108,44 +108,51 @@ module _
       else Maybe.map (Product.map₂ there) (lookupNameInNodes xs name)
 
   lookupNameInNonEmptyNodes :
-    ∀ (Γ : NetworkContext) → 
     (xs : List⁺ A)
     (name : B.VariableName) →
-    Maybe (Σ (TensorType TheoryType) (Any⁺._∈ List⁺.map getType xs))
-  lookupNameInNonEmptyNodes Γ (x ∷ xs) name =
+    Maybe (Σ (TensorType ElementType) (Any⁺._∈ List⁺.map getType xs))
+  lookupNameInNonEmptyNodes (x ∷ xs) name =
     if getName x String.== getVariableName name
       then just (getType x , Any⁺.here refl)
       else Maybe.map (Product.map₂ Any⁺.there) (lookupNameInNodes xs name)
-
+  
 lookupNameInInputs :
   ∀ {Γ} (n : NetworkDeclaration Γ) →
   B.VariableName →
-  Maybe (Σ (TensorType TheoryType) (InputVariable (Γ ∷ n)))
-lookupNameInInputs {Γ} n name = Maybe.map (Product.map₂ here) (lookupNameInNonEmptyNodes inputName inputType (Γ ∷ n) (networkInputs n) name)
+  Maybe (Σ (TensorType ElementType) (λ δ → HasInputDeclarationMatching δ n))
+lookupNameInInputs {Γ} n name = lookupNameInNonEmptyNodes inputType inputName (inputDeclarations n) name
+  
+lookupNameInHidden :
+  ∀ {Γ} (n : NetworkDeclaration Γ) →
+  B.VariableName →
+  Maybe (Σ (TensorType ElementType) (λ δ → HasHiddenDeclarationMatching δ n))
+lookupNameInHidden {Γ} n name = lookupNameInNodes hiddenType hiddenName (hiddenDeclarations n) name
   
 lookupNameInOutputs :
   ∀ {Γ} (n : NetworkDeclaration Γ) →
   B.VariableName →
-  Maybe (Σ (TensorType TheoryType) (OutputVariable (Γ ∷ n)))
-lookupNameInOutputs {Γ} n name = Maybe.map (Product.map₂ here) (lookupNameInNonEmptyNodes outputName outputType (Γ ∷ n) (networkOutputs n) name)
+  Maybe (Σ (TensorType ElementType) (λ δ → HasOutputDeclarationMatching δ n))
+lookupNameInOutputs {Γ} n name = lookupNameInNonEmptyNodes outputType outputName (outputDeclarations n) name
 
 lookupTensorVariableInNetwork : ∀ {Γ} (n : NetworkDeclaration Γ) → B.VariableName → Maybe (TensorVarResult (Γ ∷ n))
-lookupTensorVariableInNetwork n name with lookupNameInInputs n name | lookupNameInOutputs n name
-... | just (τ , i) | _            = just (τ , inj₁ i)
-... | _            | just (τ , o) = just (τ , inj₂ o)
-... | nothing      | nothing      = nothing
+lookupTensorVariableInNetwork n name with lookupNameInInputs n name | lookupNameInHidden n name | lookupNameInOutputs n name
+... | just (τ , i) | _            | _            = just (τ , inj₁ (here i))
+... | _            | just (τ , h) | _            = just (τ , inj₂ (inj₁ (here h)))
+... | _            | _            | just (τ , o) = just (τ , inj₂ (inj₂ (here o)))
+... | nothing      | nothing      | nothing      = nothing
 
 lookupTensorVariable : (Γ : NetworkContext) → B.VariableName → TCM (TensorVarResult Γ)
 lookupTensorVariable []       name = throw "Missing tensor variable"
 lookupTensorVariable (Γ ∷ n) name = do
   case lookupTensorVariableInNetwork n name of λ where
     (just result) → return result
-    nothing → Product.map₂ (Sum.map there there) <$> lookupTensorVariable Γ name
+    nothing → Product.map₂ (Sum.map there (Sum.map there there)) <$> lookupTensorVariable Γ name
 
 variablesDeclared : ∀ {Γ} → NetworkDeclaration Γ → List Name
 variablesDeclared n = do
-  let inputNames = List.map inputName (List⁺.toList $ networkInputs n)
-  let outputNames = List.map outputName (List⁺.toList $ networkOutputs n)
+  let inputNames = List.map inputName (List⁺.toList $ inputDeclarations n)
+  let hiddenNames = List.map hiddenName (hiddenDeclarations n)
+  let outputNames = List.map outputName (List⁺.toList $ outputDeclarations n)
   networkName n ∷ List.concat (inputNames ∷ outputNames ∷ [])
 
 allVariablesDeclared : NetworkContext → List Name
@@ -181,12 +188,17 @@ checkShape (d ∷ ds) with readℕ₁₀ (numberRep d)
   ds' ← checkShape ds
   return (d' ∷ ds')
 
+checkNodeName : String → TCM NodeOutputName
+checkNodeName value with Theory.readNodeOutputName value
+... | nothing = throw "unable to read ONNX name"
+... | just name = return name
+
 checkTensorShape : B.TensorShape → TCM (List ℕ)
 checkTensorShape B.scalarDims = return []
 checkTensorShape (B.tensorDims xs) = checkShape xs
 
-checkTheoryType : B.ElementType → TCM TheoryType
-checkTheoryType τ with Theory.readType (showElementType τ)
+checkElementType : B.ElementType → TCM ElementType
+checkElementType τ with Theory.readElementType (showElementType τ)
 ... | just r  = return r
 ... | nothing = throw "Could not parse type"
 
@@ -198,7 +210,7 @@ checkInputDeclaration : NetworkContext → B.InputDefinition → TCM (InputDecla
 checkInputDeclaration Γ (B.inputDef varName τ shape) = do
   name' ← checkNameUnique Γ varName
   shape' ← checkTensorShape shape
-  τ' ← checkTheoryType τ
+  τ' ← checkElementType τ
   return (declareInput name' (tensorType τ' shape'))
 checkInputDeclaration _ _ = unsupported "named outputs"
 
@@ -209,15 +221,22 @@ checkInputDeclarations Γ (x ∷ xs) = do
   xs' ← traverseTCMList (checkInputDeclaration Γ) xs
   return (x' ∷ xs')
 
-checkHiddenDeclarations : List B.HiddenDefinition → TCM ⊤
-checkHiddenDeclarations [] = return _
-checkHiddenDeclarations (_ ∷ _) = throw "Parser does not currently support hidden definitions"
+checkHiddenDeclaration : NetworkContext → B.HiddenDefinition → TCM (HiddenDeclaration)
+checkHiddenDeclaration Γ (B.hiddenDef varName τ shape nodeName) = do
+  name' ← checkNameUnique Γ varName
+  shape' ← checkTensorShape shape
+  τ' ← checkElementType τ
+  nodeName' ← checkNodeName (String.fromList nodeName)
+  return (declareHidden name' (tensorType τ' shape') nodeName')
+
+checkHiddenDeclarations : NetworkContext → List B.HiddenDefinition → TCM (List HiddenDeclaration)
+checkHiddenDeclarations Γ = traverseTCMList (checkHiddenDeclaration Γ)
 
 checkOutputDeclaration : NetworkContext → B.OutputDefinition → TCM OutputDeclaration
 checkOutputDeclaration Γ (B.outputDef varName e t) = do
   name ← checkNameUnique Γ varName
   t' ← checkTensorShape t
-  e' ← checkTheoryType e
+  e' ← checkElementType e
   return (declareOutput name (tensorType e' t'))
 checkOutputDeclaration _ _ = unsupported "named outputs"
 
@@ -233,9 +252,9 @@ checkNetworkDeclaration Γ (B.networkDef varName equivs inputs hidden outputs) =
   name ← checkNameUnique Γ varName
   checkEquivalenceStatements equivs
   inputs ← checkInputDeclarations Γ inputs
-  checkHiddenDeclarations hidden
+  hidden ← checkHiddenDeclarations Γ hidden
   outputs ← checkOutputDeclarations Γ outputs
-  let decl = declareNetwork name inputs outputs
+  let decl = declareNetwork name inputs hidden outputs
   checkNamesLocallyUnique decl
   return decl
 
@@ -262,18 +281,19 @@ checkIndices (i ∷ is) (d ∷ ds) = do
 
 module _ (Γ : NetworkContext) where
 
-  checkNumber : B.Number → (τ : TheoryType) → TCM (ArithExpr Γ τ)
+  checkNumber : B.Number → (τ : ElementType) → TCM (ArithExpr Γ τ)
   checkNumber num τ with Theory.readNumber τ (numberRep num)
   ... | just value = return $ constant value
   ... | nothing = throw "Cannot parse onnx number"
 
-  checkVariable : B.VariableName → List B.Number → TCM (Σ TheoryType (ArithExpr Γ))
+  checkVariable : B.VariableName → List B.Number → TCM (Σ ElementType (ArithExpr Γ))
   checkVariable varName indices = do
     (tensorType τ shape , var) ← lookupTensorVariable Γ varName
     indices' ← checkIndices indices shape
     let expr = case var of λ where
       (inj₁ input) → inputVar (elementVar shape input indices')
-      (inj₂ output) → outputVar (elementVar shape output indices')
+      (inj₂ (inj₁ hidden)) → hiddenVar (elementVar shape hidden indices')
+      (inj₂ (inj₂ output)) → outputVar (elementVar shape output indices')
     return (τ , expr)
     
   mutual
@@ -294,10 +314,10 @@ module _ (Γ : NetworkContext) where
     inferListArithExpr (x ∷ xs) = zipInference Theory._≟_ _∷_ (inferArithExpr x) (inferListArithExpr xs)
 
   checkComparison :
-    ({τ : TheoryType} → ArithExpr Γ τ → ArithExpr Γ τ → CompExpr Γ τ) →
+    ({τ : ElementType} → ArithExpr Γ τ → ArithExpr Γ τ → CompExpr Γ τ) →
     B.ArithExpr →
     B.ArithExpr →
-    TCM (Σ TheoryType (CompExpr Γ))
+    TCM (Σ ElementType (CompExpr Γ))
   checkComparison f e₁ e₂ = do
     let inference = zipInference Theory._≟_ f (inferArithExpr e₁) (inferArithExpr e₂)
     case inference of λ where

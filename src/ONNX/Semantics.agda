@@ -4,57 +4,60 @@ open import ONNX.Syntax
 module ONNX.Semantics where
 
 open import Data.Bool.Base
+open import Data.List.Base using (List; [])
 open import Data.List.Relation.Unary.All using (All)
+open import Data.List.NonEmpty.Base using (List⁺; _∷_)
 open import Data.List.NonEmpty.Relation.Unary.All using () renaming (All to All⁺)
 open import Level
 
 open import Data.Tensor
 
--- The type of unary tensor operations
-TensorOp1 : Set → Set
-TensorOp1 τ = ∀ {shape} → Tensor τ shape → Tensor τ shape
+module _ {ElementType : Set} (⟦ElementType⟧ : ElementType → Set) where
 
--- The type of binary tensor operations
-TensorOp2 : Set → Set
-TensorOp2 τ = ∀ {shape} → Tensor τ shape → Tensor τ shape → Tensor τ shape
+  TensorSemantics : TensorType ElementType → Set
+  TensorSemantics (tensorType τ shape) = Tensor (⟦ElementType⟧ τ) shape
 
--- The type of tensor comparisons
-TensorComp : Set → Set
-TensorComp τ = ∀ {shape} → Tensor τ shape → Tensor τ shape → Bool
+  InputSemantics : NetworkType ElementType → Set
+  InputSemantics (networkType inputTypes _) = All⁺ TensorSemantics inputTypes
+  
+  -- The type of unary tensor operations
+  TensorOp1 : TensorType ElementType → Set
+  TensorOp1 δ = TensorSemantics δ → TensorSemantics δ
 
-TensorSemantics : ∀ {Types : Set} → (Types → Set) → TensorType Types → Set
-TensorSemantics sem (tensorType τ shape) = Tensor (sem τ) shape
+  -- The type of binary tensor operations
+  TensorOp2 : TensorType ElementType → Set
+  TensorOp2 δ = TensorSemantics δ → TensorSemantics δ → TensorSemantics δ
 
-InputsSemantics : ∀ {Types : Set} → (Types → Set) → InputTypes Types → Set
-InputsSemantics sem tensorTypes = All⁺ (TensorSemantics sem) tensorTypes
+  -- The type of tensor comparisons
+  TensorComp : TensorType ElementType → Set
+  TensorComp δ = TensorSemantics δ → TensorSemantics δ → Bool
 
-OutputsSemantics : ∀ {Types : Set} → (Types → Set) → OutputTypes Types → Set
-OutputsSemantics sem tensorTypes = All⁺ (TensorSemantics sem) tensorTypes
+  NetworkSemantics : List⁺ (TensorType ElementType) → TensorType ElementType → Set
+  NetworkSemantics inputTypes outputType = All⁺ TensorSemantics inputTypes → TensorSemantics outputType
 
--- The semantics of networks
-NetworkSemantics : ∀ {Types : Set} → (Types → Set) → NetworkType Types → Set
-NetworkSemantics sem (networkType inputTypes outputTypes) =
-  InputsSemantics sem inputTypes → OutputsSemantics sem outputTypes
 
 -- An implementation of the subset of the semantics of ONNX necessary to define
 -- the semantics of VNN-LIB.
 record NetworkTheorySemantics (syn : NetworkTheorySyntax) : Set₁ where
   open NetworkTheorySyntax syn
+  
   field
     -- The interpretation of network types
-    ⟦theoryType⟧    : TheoryType → Set
+    ⟦elementType⟧ : ElementType → Set
+    
     -- The interpretation of network tensors
-    ⟦theoryTensor⟧  : ∀ {τ} → TheoryTensor τ → TensorSemantics ⟦theoryType⟧ τ
-    -- The interpretation of network networks
-    ⟦theoryNetwork⟧ : ∀ {τ} → TheoryNetwork τ → NetworkSemantics ⟦theoryType⟧ τ
+    ⟦theoryTensor⟧  : ∀ {τ} → TheoryTensor τ → TensorSemantics ⟦elementType⟧ τ
+    
+    -- The interpretation of a network allows us to evaluate the network at any node
+    ⟦model⟧ : ∀ {γ} (n : Model γ) → InputSemantics ⟦elementType⟧ γ → ∀ {δ} → Node n δ → TensorSemantics ⟦elementType⟧ δ
     
     -- The interpretation of the basic ONNX tensor operations at each type
-    ⟦≤⟧   : ∀ {τ} → TensorComp (⟦theoryType⟧ τ) 
-    ⟦<⟧   : ∀ {τ} → TensorComp (⟦theoryType⟧ τ) 
-    ⟦≥⟧   : ∀ {τ} → TensorComp (⟦theoryType⟧ τ) 
-    ⟦>⟧   : ∀ {τ} → TensorComp (⟦theoryType⟧ τ) 
-    ⟦=⟧   : ∀ {τ} → TensorComp (⟦theoryType⟧ τ) 
-    ⟦≠⟧   : ∀ {τ} → TensorComp (⟦theoryType⟧ τ) 
-    ⟦neg⟧ : ∀ {τ} → TensorOp1  (⟦theoryType⟧ τ)
-    ⟦add⟧ : ∀ {τ} → TensorOp2  (⟦theoryType⟧ τ)
-    ⟦mul⟧ : ∀ {τ} → TensorOp2  (⟦theoryType⟧ τ)
+    ⟦≤⟧   : ∀ {δ} → TensorComp ⟦elementType⟧ δ 
+    ⟦<⟧   : ∀ {δ} → TensorComp ⟦elementType⟧ δ 
+    ⟦≥⟧   : ∀ {δ} → TensorComp ⟦elementType⟧ δ 
+    ⟦>⟧   : ∀ {δ} → TensorComp ⟦elementType⟧ δ 
+    ⟦=⟧   : ∀ {δ} → TensorComp ⟦elementType⟧ δ 
+    ⟦≠⟧   : ∀ {δ} → TensorComp ⟦elementType⟧ δ 
+    ⟦neg⟧ : ∀ {δ} → TensorOp1  ⟦elementType⟧ δ
+    ⟦add⟧ : ∀ {δ} → TensorOp2  ⟦elementType⟧ δ
+    ⟦mul⟧ : ∀ {δ} → TensorOp2  ⟦elementType⟧ δ

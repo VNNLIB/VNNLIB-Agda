@@ -15,7 +15,8 @@ open NetworkTheorySyntax theorySyntax
 -- to various objects in the theory.
 record NetworkTheoryParser : Set where
   field
-    readType : String → Maybe TheoryType
-    readNumber : (τ : TheoryType) → String → Maybe (TheoryTensor (tensorType τ []))
-
-    _≟_ : DecidableEquality TheoryType
+    readElementType : String → Maybe ElementType
+    readNumber : (τ : ElementType) → String → Maybe (TheoryTensor (tensorType τ []))
+    readNodeOutputName : String → Maybe NodeOutputName
+    
+    _≟_ : DecidableEquality ElementType

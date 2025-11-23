@@ -44,3 +44,7 @@ satisfied-all-list (there pxs) (qx ListAll.∷ qxs) = satisfied-all-list pxs qxs
 satisfied-all : Any P xs → All Q xs → ∃ λ x → P x × Q x
 satisfied-all (here  px)  (qx ∷ qxs) = _ , px , qx
 satisfied-all (there pxs) (qx ∷ qxs) = satisfied-all-list pxs qxs
+
+lookup : {P : Pred A p} → Any P xs → A
+lookup {xs = x ∷ _} (here px) = x
+lookup (there pxs) = ListAny.lookup pxs
