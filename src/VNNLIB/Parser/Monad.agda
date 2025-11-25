@@ -1,4 +1,4 @@
-module VNNLIB.TypeCheck.Monad where
+module VNNLIB.Parser.Monad where
 
 open import Level
 open import Data.Bool.Base using (if_then_else_)
