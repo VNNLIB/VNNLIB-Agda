@@ -58,36 +58,30 @@ record RealModel (networkType : NetworkType RealElementType) : Set where
     runtimeNetwork : Model runtimeNetworkType
     sameShape : runtimeNetworkType SameNetworkShapeAs networkType
 
+RealNodeOutputName : Set
+RealNodeOutputName = NodeOutputName
+
 -- Likewise nodes are just nodes from the parent theory that match the required shape
 -- (although the element types will necessarily differ!)
-record RealNode {γ} (network : RealModel γ) (nodeType : TensorType RealElementType) : Set where
-  constructor realNode
+record RealNodeOutput {γ} (network : RealModel γ) (name : RealNodeOutputName) (nodeType : TensorType RealElementType) : Set where
+  constructor realNodeOutput
   field
     {runtimeNodeType} : TensorType ElementType
-    runtimeNode : Node (RealModel.runtimeNetwork network) runtimeNodeType
+    runtimeNode : NodeOutput (RealModel.runtimeNetwork network) name runtimeNodeType
     sameShape : runtimeNodeType SameShapeAs nodeType
 
-realInputNodes : ∀ {γ} (n : RealModel γ) → All⁺ (RealNode n) (NetworkType.inputs γ)
-realInputNodes (realModel runtimeNetwork (sameNetworkShape inputsSameShape _)) =
-  All.zipWith realNode (inputNodes runtimeNetwork) inputsSameShape
-
-realOutputNodes : ∀ {γ} (n : RealModel γ) → All⁺ (RealNode n) (NetworkType.outputs γ)
-realOutputNodes (realModel runtimeNetwork (sameNetworkShape _ outputsSameShape)) =
-  All.zipWith realNode (outputNodes runtimeNetwork) outputsSameShape
-
-RealNodeHasOutput : ∀ {γ} {n : RealModel γ} {δ} → RealNode n δ → NodeOutputName → Set
-RealNodeHasOutput (realNode runtimeNode sameNodeShape) = NodeHasOutput runtimeNode
+realModelOutputs : ∀ {γ} (n : RealModel γ) → All⁺ (λ δ → ∃ λ u → RealNodeOutput n u δ) (NetworkType.outputs γ)
+realModelOutputs (realModel runtimeNetwork (sameNetworkShape _ outputsSameShape)) =
+  All.zipWith (λ {(u , z) eq → (u , realNodeOutput z eq)}) (modelOutputs runtimeNetwork) outputsSameShape
 
 realSyntax : NetworkTheorySyntax
 realSyntax = record
   { ElementType = RealElementType
   ; TheoryTensor = RealTheoryTensor
   ; Model = RealModel
-  ; NodeOutputName = NodeOutputName
-  ; Node = RealNode
-  ; inputNodes = realInputNodes
-  ; outputNodes = realOutputNodes
-  ; NodeHasOutput = RealNodeHasOutput
+  ; NodeOutputName = RealNodeOutputName
+  ; NodeOutput = RealNodeOutput
+  ; modelOutputs = realModelOutputs
   }
 
 ---------------
@@ -108,8 +102,8 @@ RealNetworkSemantics =
   (n : Model γ₁) →
   γ₁ SameNetworkShapeAs γ₂ →
   InputSemantics ⟦realElementType⟧ γ₂ →
-  ∀ {δ₁ δ₂} →
-  Node n δ₁ →
+  ∀ {δ₁ δ₂ u} →
+  NodeOutput n u δ₁ →
   δ₁ SameShapeAs δ₂ →
   TensorSemantics ⟦realElementType⟧ δ₂
 
@@ -118,8 +112,8 @@ RealNetworkSemantics =
 
 -- Given some way of interpreting the syntactic networks as networks over reals,
 -- we simply run the real interpretation.
-⟦realModel⟧ : RealNetworkSemantics → ∀ {γ} (n : RealModel γ) → InputSemantics ⟦realElementType⟧ γ → ∀ {δ} → RealNode n δ → TensorSemantics ⟦realElementType⟧ δ
-⟦realModel⟧ ⟦realNetwork⟧ (realModel runtimeNetwork sameShape) realInputs (realNode runtimeNode sameNodeShape) =
+⟦realModel⟧ : RealNetworkSemantics → ∀ {γ} (n : RealModel γ) → InputSemantics ⟦realElementType⟧ γ → ∀ {δ u} → RealNodeOutput n u δ → TensorSemantics ⟦realElementType⟧ δ
+⟦realModel⟧ ⟦realNetwork⟧ (realModel runtimeNetwork sameShape) realInputs (realNodeOutput runtimeNode sameNodeShape) =
   ⟦realNetwork⟧ runtimeNetwork sameShape realInputs runtimeNode sameNodeShape
   
 realSemantics : RealNetworkSemantics → NetworkTheorySemantics realSyntax

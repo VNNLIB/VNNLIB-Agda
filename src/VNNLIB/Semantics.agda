@@ -67,8 +67,8 @@ createNetworkVariableValues :
   NetworkVariableValues d 
 createNetworkVariableValues (networkImplementation network hiddenNodeMapping) inputs = do
   let ⟦inputs⟧ = All⁺.map ⟦theoryTensor⟧ inputs
-  let ⟦hidden⟧ = All.map⁺ (All.map (⟦model⟧ network ⟦inputs⟧ ∘ hiddenNode) hiddenNodeMapping)
-  let ⟦outputs⟧ = All⁺.map (⟦model⟧ network ⟦inputs⟧) (outputNodes network)
+  let ⟦hidden⟧ = All.map⁺ (All.map (⟦model⟧ network ⟦inputs⟧) hiddenNodeMapping)
+  let ⟦outputs⟧ = All⁺.map (λ (u , z) → ⟦model⟧ network ⟦inputs⟧ z) (modelOutputs network)
   variableValues ⟦inputs⟧ ⟦hidden⟧ ⟦outputs⟧
 
 Environment : NetworkContext → Set

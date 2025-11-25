@@ -291,12 +291,8 @@ lookupNetwork (Δ ∷ Δₙ) (there Pxs) = lookupNetwork Δ Pxs
 -- Runtime networks --
 ----------------------
 
-record CorrespondingHiddenNode {γ} (network : Model γ) (h : HiddenDeclaration) : Set where
-  field
-    hiddenNode : Node network (hiddenType h)
-    hasOutput  : NodeHasOutput hiddenNode (nodeOutputName h)
-
-open CorrespondingHiddenNode public
+CorrespondingHiddenNode : ∀ {γ} → Model γ → HiddenDeclaration → Set
+CorrespondingHiddenNode network h = NodeOutput network (nodeOutputName h) (hiddenType h)
 
 record NetworkImplementation {Γ} (d : NetworkDeclaration Γ) : Set where
   constructor networkImplementation

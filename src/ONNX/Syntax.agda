@@ -34,30 +34,24 @@ record NetworkType (Types : Set) : Set where
     outputs : OutputTypes Types
 
 
--- An implementation of the subset of syntax of ONNX necessary to define
+-- An implementation of the syntax for models of neural networks necessary to define
 -- the syntax of VNN-LIB.
 record NetworkTheorySyntax : Set₁ where
   field
-    -- The set of types in the ONNX specification
+    -- The set of numeric element types allowed by the network theory
     ElementType : Set
 
-    -- The internal ONNX representation of tensors
+    -- The internal representation of tensors in the network theory
     TheoryTensor : TensorType ElementType → Set
 
-    -- The internal ONNX representation of networks
+    -- The internal representation of networks in the network theory
     Model : NetworkType ElementType → Set
-
-    -- A pointer to a node in the network with a given type. 
-    Node : ∀ {γ} → Model γ → TensorType ElementType → Set
-
-    -- A function that returns the input nodes of a network
-    inputNodes : ∀ {γ} (n : Model γ) → All⁺ (Node n) (NetworkType.inputs γ)
-    
-    -- A function that returns the output nodes of a network
-    outputNodes : ∀ {γ} (n : Model γ) → All⁺ (Node n) (NetworkType.outputs γ)
 
     -- The set of allowable names for the output tensors of nodes inside of networks
     NodeOutputName : Set
     
-    -- A judgement that a network contains a node of with an output of a given name
-    NodeHasOutput : ∀ {γ} {n : Model γ} {δ} → Node n δ → NodeOutputName → Set 
+    -- A judgement that a node contains an output with a given name
+    NodeOutput : ∀ {γ} → Model γ → NodeOutputName → TensorType ElementType → Set 
+
+    -- A function that maps a model to a list of its outputs
+    modelOutputs : ∀ {γ} (m : Model γ) → All⁺ (λ δ → ∃ λ u → NodeOutput m u δ) (NetworkType.outputs γ)
