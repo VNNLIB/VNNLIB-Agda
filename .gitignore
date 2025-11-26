@@ -1,5 +1,5 @@
 src/MAlonzo/**
 _build/**
-src/VNNLIB/Syntax/**
+src/VNNLIB/Grammar/**
 Main
 src/**/*.agda~

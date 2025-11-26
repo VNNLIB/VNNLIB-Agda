@@ -36,8 +36,8 @@ import Data.List.NonEmpty.Relation.Unary.Any as Any⁺
 import Data.List.NonEmpty.Membership.Propositional as Any⁺
 open import Data.ReadUtils
 
-import VNNLIB.Syntax.AST as B hiding (String)
-import VNNLIB.Syntax.Parser as B using (parseQuery; Err)
+import VNNLIB.Grammar.AST as B hiding (String)
+import VNNLIB.Grammar.Parser as B using (parseQuery; Err)
 open import VNNLIB.Syntax theorySyntax
 open import VNNLIB.Parser.Monad
 
@@ -58,28 +58,7 @@ numberRep : B.Number → String
 numberRep (B.number (B.#pair pos name)) = name
 
 showElementType : B.ElementType → String
-showElementType B.genericElementType    = "Real"
-showElementType B.elementTypeF16        = "float16"
-showElementType B.elementTypeF32        = "float32"
-showElementType B.elementTypeF64        = "float64"
-showElementType B.elementTypeBF16       = "bfloat16"
-showElementType B.elementTypeF8E4M3FN   = "float8e4m3fn"
-showElementType B.elementTypeF8E5M2     = "float8e5m2"
-showElementType B.elementTypeF8E4M3FNUZ = "float8e4m3fnuz"
-showElementType B.elementTypeF8E5M2FNUZ = "float8e5m2fnuz"
-showElementType B.elementTypeF4E2M1     = "float4e2m1"
-showElementType B.elementTypeI8         = "int8"
-showElementType B.elementTypeI16        = "int16"
-showElementType B.elementTypeI32        = "int32"
-showElementType B.elementTypeI64        = "int64"
-showElementType B.elementTypeU8         = "uint8"
-showElementType B.elementTypeU16        = "uint16"
-showElementType B.elementTypeU32        = "uint32"
-showElementType B.elementTypeU64        = "uint64"
-showElementType B.elementTypeC64        = "complex64"
-showElementType B.elementTypeC128       = "complex128"
-showElementType B.elementTypeBool       = "bool"
-showElementType B.elementTypeString     = "string"
+showElementType (B.dType x) = getVariableName x
 
 -------------
 -- Context --
@@ -188,8 +167,8 @@ checkShape (d ∷ ds) with readℕ₁₀ (numberRep d)
   ds' ← checkShape ds
   return (d' ∷ ds')
 
-checkNodeName : String → TCM NodeOutputName
-checkNodeName value with Theory.readNodeOutputName value
+checkNodeName : B.OnnxName → TCM NodeOutputName
+checkNodeName (B.nodeName value) with Theory.readNodeOutputName (String.fromList value)
 ... | nothing = throw "unable to read ONNX name"
 ... | just name = return name
 
@@ -202,7 +181,7 @@ checkElementType τ with Theory.readElementType (showElementType τ)
 ... | just r  = return r
 ... | nothing = throw "Could not parse type"
 
-checkEquivalenceStatements : List B.CompStm → TCM ⊤
+checkEquivalenceStatements : List B.NetworkEquivalence → TCM ⊤
 checkEquivalenceStatements [] = return _
 checkEquivalenceStatements (_ ∷ _) = unsupported "equivalence statements"
 
@@ -212,7 +191,6 @@ checkInputDeclaration Γ (B.inputDef varName τ shape) = do
   shape' ← checkTensorShape shape
   τ' ← checkElementType τ
   return (declareInput name' (tensorType τ' shape'))
-checkInputDeclaration _ _ = unsupported "named outputs"
 
 checkInputDeclarations : NetworkContext → List B.InputDefinition → TCM (List⁺ InputDeclaration)
 checkInputDeclarations Γ [] = throw "Must be at least one input definition"
@@ -222,12 +200,12 @@ checkInputDeclarations Γ (x ∷ xs) = do
   return (x' ∷ xs')
 
 checkHiddenDeclaration : NetworkContext → B.HiddenDefinition → TCM (HiddenDeclaration)
-checkHiddenDeclaration Γ (B.hiddenDef varName τ shape nodeName) = do
+checkHiddenDeclaration Γ (B.hiddenDef varName τ shape (B.nodeName nodeOutputName)) = do
   name' ← checkNameUnique Γ varName
   shape' ← checkTensorShape shape
   τ' ← checkElementType τ
-  nodeName' ← checkNodeName (String.fromList nodeName)
-  return (declareHidden name' (tensorType τ' shape') nodeName')
+  nodeOutputName' ← checkNodeName (B.nodeName nodeOutputName)
+  return (declareHidden name' (tensorType τ' shape') nodeOutputName')
 
 checkHiddenDeclarations : NetworkContext → List B.HiddenDefinition → TCM (List HiddenDeclaration)
 checkHiddenDeclarations Γ = traverseTCMList (checkHiddenDeclaration Γ)
@@ -238,7 +216,6 @@ checkOutputDeclaration Γ (B.outputDef varName e t) = do
   t' ← checkTensorShape t
   e' ← checkElementType e
   return (declareOutput name (tensorType e' t'))
-checkOutputDeclaration _ _ = unsupported "named outputs"
 
 checkOutputDeclarations : NetworkContext → List B.OutputDefinition → TCM (List⁺ OutputDeclaration)
 checkOutputDeclarations Γ [] = throw "Must be at least one output definition"
@@ -298,12 +275,13 @@ module _ (Γ : NetworkContext) where
     
   mutual
     inferArithExpr : B.ArithExpr → Inference (ArithExpr Γ)
-    inferArithExpr (B.valExpr x)           = unknownType $ checkNumber x
-    inferArithExpr (B.varExpr var indices) = knownType $ checkVariable var indices
-    inferArithExpr (B.negate a)            = mapInference negate (inferArithExpr a)
-    inferArithExpr (B.plus as)             = mapInference add (inferList⁺ArithExpr as)
-    inferArithExpr (B.minus a as)          = mapInference sub (inferList⁺ArithExpr (a ∷ as))
-    inferArithExpr (B.multiply as)         = mapInference mul (inferList⁺ArithExpr as)
+    inferArithExpr (B.valExpr x)                 = unknownType $ checkNumber x
+    inferArithExpr (B.scalarVarExpr var)         = knownType $ checkVariable var []
+    inferArithExpr (B.tensorVarExpr var indices) = knownType $ checkVariable var indices
+    inferArithExpr (B.negate a)                  = mapInference negate (inferArithExpr a)
+    inferArithExpr (B.plus as)                   = mapInference add (inferList⁺ArithExpr as)
+    inferArithExpr (B.minus a as)                = mapInference sub (inferList⁺ArithExpr (a ∷ as))
+    inferArithExpr (B.multiply as)               = mapInference mul (inferList⁺ArithExpr as)
 
     inferList⁺ArithExpr : List B.ArithExpr → Inference (λ τ → List⁺ (ArithExpr Γ τ))
     inferList⁺ArithExpr [] = knownType $ throw "Boolean operators must have at least one argument"

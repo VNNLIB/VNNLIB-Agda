@@ -49,7 +49,7 @@ record NetworkTheorySemantics (syn : NetworkTheorySyntax) : Set₁ where
     ⟦theoryTensor⟧  : ∀ {τ} → TheoryTensor τ → TensorSemantics ⟦elementType⟧ τ
     
     -- The interpretation of a network allows us to evaluate the network at any node
-    ⟦model⟧ : ∀ {γ} (n : Model γ) → InputSemantics ⟦elementType⟧ γ → ∀ {δ} → Node n δ → TensorSemantics ⟦elementType⟧ δ
+    ⟦model⟧ : ∀ {γ} (n : Model γ) → InputSemantics ⟦elementType⟧ γ → ∀ {δ u} → NodeOutput n u δ → TensorSemantics ⟦elementType⟧ δ
     
     -- The interpretation of the basic ONNX tensor operations at each type
     ⟦≤⟧   : ∀ {δ} → TensorComp ⟦elementType⟧ δ 

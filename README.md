@@ -6,7 +6,7 @@ It includes:
 - `ONNX.Semantics`: abstract interface for the semantics of ONNX
 - `ONNX.Parser`: very minimal abstract interface for parsing ONNX constants
 - `VNNLIB.Syntax` - intrinsically-typed syntax for VNNLIB queries
-- `VNNLIB.TypeCheck` - ability to parse/type-check a string into VNNLIB queries.
+- `VNNLIB.Parser` - ability to parse/type-check a string into VNNLIB queries.
 - `VNNLIB.Semantics` - semantics for VNNLIB queries
 - `VNNLIB.Theories` - orthogonal subsets of the query syntax
 - `VNNLIB.Logics` - overall subsets of the query syntax
@@ -36,5 +36,5 @@ Later versions of these tools may work but are not tested.
 
 3. Use BNFC to create the parser from the official VNN-LIB grammar.
   ```bash
-  bnfc -d --agda VNNLIB-Standard/syntax.cf -o src -p VNNLIB
+  bnfc -d --agda VNNLIB-Standard/grammar.cf -o src -p VNNLIB
   ```
