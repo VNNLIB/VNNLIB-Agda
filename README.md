@@ -34,14 +34,4 @@ Later versions of these tools may work but are not tested.
 
 ## Setup
 
-1. Clone this repository.
-
-2. Initialise the submodules to get the official VNN-LIB grammar from the VNN-LIB Standard repository
-  ```bash
-  git submodule update --init --recursive
-  ```
-
-3. Use BNFC to create the parser from the official VNN-LIB grammar.
-  ```bash
-  bnfc -d --agda VNNLIB-Standard/grammar.cf -o src -p VNNLIB
-  ```
+Agda does not yet have a good story for distributing libraries. Please follow the instructions for building from source in [CONTRIBUTING.md](https://github.com/VNNLIB/VNNLIB-Agda/blob/main/CONTRIBUTING.md).
