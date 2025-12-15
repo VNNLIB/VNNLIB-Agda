@@ -36,7 +36,7 @@ import Data.List.NonEmpty.Relation.Unary.Any as Any⁺
 import Data.List.NonEmpty.Membership.Propositional as Any⁺
 open import Data.ReadUtils
 
-import VNNLIB.Grammar.AST as B hiding (String)
+import VNNLIB.Grammar.AST as B
 import VNNLIB.Grammar.Parser as B using (parseQuery; Err)
 open import VNNLIB.Syntax theorySyntax
 open import VNNLIB.Parser.Monad
@@ -56,9 +56,6 @@ getVariableName (B.variableName (B.#pair pos name)) = name
 
 numberRep : B.Number → String
 numberRep (B.number (B.#pair pos name)) = name
-
-showElementType : B.ElementType → String
-showElementType (B.dType x) = getVariableName x
 
 -------------
 -- Context --
@@ -168,7 +165,7 @@ checkShape (d ∷ ds) with readℕ₁₀ (numberRep d)
   return (d' ∷ ds')
 
 checkNodeName : B.OnnxName → TCM NodeOutputName
-checkNodeName (B.nodeName value) with Theory.readNodeOutputName (String.fromList value)
+checkNodeName (B.nodeName (B.onnxString value)) with Theory.readNodeOutputName value
 ... | nothing = throw "unable to read ONNX name"
 ... | just name = return name
 
@@ -177,7 +174,7 @@ checkTensorShape B.scalarDims = return []
 checkTensorShape (B.tensorDims xs) = checkShape xs
 
 checkElementType : B.ElementType → TCM ElementType
-checkElementType τ with Theory.readElementType (showElementType τ)
+checkElementType (B.dType τ) with Theory.readElementType (getVariableName τ)
 ... | just r  = return r
 ... | nothing = throw "Could not parse type"
 
@@ -200,12 +197,12 @@ checkInputDeclarations Γ (x ∷ xs) = do
   return (x' ∷ xs')
 
 checkHiddenDeclaration : NetworkContext → B.HiddenDefinition → TCM (HiddenDeclaration)
-checkHiddenDeclaration Γ (B.hiddenDef varName τ shape (B.nodeName nodeOutputName)) = do
+checkHiddenDeclaration Γ (B.hiddenDef varName τ shape node) = do
   name' ← checkNameUnique Γ varName
   shape' ← checkTensorShape shape
   τ' ← checkElementType τ
-  nodeOutputName' ← checkNodeName (B.nodeName nodeOutputName)
-  return (declareHidden name' (tensorType τ' shape') nodeOutputName')
+  nodeName' ← checkNodeName node
+  return (declareHidden name' (tensorType τ' shape') nodeName')
 
 checkHiddenDeclarations : NetworkContext → List B.HiddenDefinition → TCM (List HiddenDeclaration)
 checkHiddenDeclarations Γ = traverseTCMList (checkHiddenDeclaration Γ)

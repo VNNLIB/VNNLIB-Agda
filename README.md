@@ -12,6 +12,13 @@ It includes:
 - `VNNLIB.Logics` - overall subsets of the query syntax
 - `VNNLIB.Solver` - an interface for solvers of VNNLIB queries
 
+## Known short-comings
+
+* Does not yet cover:
+
+  - Network equivalence statements
+  - Logics and theories
+
 ## Version compatibility
 
 | VNNLIB-Agda version | VNNLIB version |

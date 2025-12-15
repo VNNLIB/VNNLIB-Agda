@@ -29,7 +29,7 @@ open import Data.Maybe.Effectful
 
 open RawMonad (monad {0ℓ})
 
-open import VNNLIB.Grammar.AST as 𝐁 hiding (String)
+open import VNNLIB.Grammar.AST as 𝐁
 
 ^-nonZero : ∀ m n → .{{ℕ.NonZero m}} → ℕ.NonZero (m ℕ.^ n)
 ^-nonZero m zero           = _
