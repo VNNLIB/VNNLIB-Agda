@@ -61,9 +61,6 @@ numberRep (B.number (B.#pair pos name)) = name
 -- Context --
 -------------
 
-liftNetwork : ∀ {Γ} (n : NetworkDeclaration Γ) → NetworkDeclaration Γ → NetworkDeclaration (Γ ∷ n)
-liftNetwork _ (declareNetwork name inputs hidden outputs) = declareNetwork name inputs hidden outputs
-
 TensorVarResult : NetworkContext → Set
 TensorVarResult Γ = Σ (TensorType ElementType) (λ τ → InputVariable Γ τ ⊎ HiddenVariable Γ τ ⊎ OutputVariable Γ τ)
 
@@ -221,6 +218,8 @@ checkOutputDeclarations Γ (x ∷ xs) = do
   xs' ← traverseTCMList (checkOutputDeclaration Γ) xs
   return (x' ∷ xs')
 
+postulate checkEquivalenceStatement : (Γ : NetworkContext) → List B.NetworkEquivalence → TCM (NetworkEquivalence Γ)
+
 checkNetworkDeclaration : ∀ Γ → B.NetworkDefinition → TCM (NetworkDeclaration Γ)
 checkNetworkDeclaration Γ (B.networkDef varName equivs inputs hidden outputs) = do
   name ← checkNameUnique Γ varName
@@ -228,7 +227,8 @@ checkNetworkDeclaration Γ (B.networkDef varName equivs inputs hidden outputs) =
   inputs ← checkInputDeclarations Γ inputs
   hidden ← checkHiddenDeclarations Γ hidden
   outputs ← checkOutputDeclarations Γ outputs
-  let decl = declareNetwork name inputs hidden outputs
+  equivalence ← checkEquivalenceStatement Γ equivs
+  let decl = declareNetwork name inputs hidden outputs equivalence
   checkNamesLocallyUnique decl
   return decl
 

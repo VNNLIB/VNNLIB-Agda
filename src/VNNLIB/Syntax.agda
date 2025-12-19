@@ -90,17 +90,27 @@ mutual
     [] : NetworkContext
     _∷_ : (Γ : NetworkContext) → NetworkDeclaration Γ → NetworkContext
 
+  ----------------------------------
+  -- Network congruence statement --
+  ----------------------------------
+  data NetworkEquivalence (Γ : NetworkContext) : Set where
+    none : NetworkEquivalence Γ
+    equal-to : EqualNetworkVariable Γ → NetworkEquivalence Γ
+    isomorphic-to : IsomorphicNetworkVariable Γ → NetworkEquivalence Γ
+
   ------------------------
   -- Network definition --
   ------------------------
   
   record NetworkDeclaration (Γ : NetworkContext) : Set where
+    inductive
     constructor declareNetwork
     field
       networkName        : Name
       inputDeclarations  : List⁺ InputDeclaration
       hiddenDeclarations : List HiddenDeclaration
       outputDeclarations : List⁺ OutputDeclaration
+      equivalence         : NetworkEquivalence Γ
 
   typeOfInputs : ∀ {Γ} → NetworkDeclaration Γ → InputTypes ElementType
   typeOfInputs d = List⁺.map inputType (NetworkDeclaration.inputDeclarations d)
