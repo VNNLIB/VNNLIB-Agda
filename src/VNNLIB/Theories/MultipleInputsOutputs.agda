@@ -52,6 +52,6 @@ instance
   MultipleInputsOutputsInterpretation = record
     { interpretation = λ
       { SIO → SingleInputsOutputsTheory
-      ; MIO → SingleInputsOutputsTheory
+      ; MIO → MultipleInputsOutputsTheory
       }
     }
