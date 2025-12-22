@@ -11,6 +11,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.NonEmpty.Base as List⁺ using (List⁺)
 open import Data.List.NonEmpty.Relation.Unary.All using () renaming (All to All⁺)
 open import Data.String.Base using (String)
+open import Data.Maybe using (Maybe)
 open import Data.Fin.Base as Fin using (Fin)
 open import Data.Vec.Base as Vec using (Vec; []; _∷_)
 open import Data.Bool.Base using (Bool)
@@ -94,7 +95,6 @@ mutual
   -- Network congruence statement --
   ----------------------------------
   data NetworkEquivalence (Γ : NetworkContext) : Set where
-    none : NetworkEquivalence Γ
     equal-to : EqualNetworkVariable Γ → NetworkEquivalence Γ
     isomorphic-to : IsomorphicNetworkVariable Γ → NetworkEquivalence Γ
 
@@ -107,10 +107,10 @@ mutual
     constructor declareNetwork
     field
       networkName        : Name
+      equivalence        : Maybe (NetworkEquivalence Γ)
       inputDeclarations  : List⁺ InputDeclaration
       hiddenDeclarations : List HiddenDeclaration
       outputDeclarations : List⁺ OutputDeclaration
-      equivalence         : NetworkEquivalence Γ
 
   typeOfInputs : ∀ {Γ} → NetworkDeclaration Γ → InputTypes ElementType
   typeOfInputs d = List⁺.map inputType (NetworkDeclaration.inputDeclarations d)

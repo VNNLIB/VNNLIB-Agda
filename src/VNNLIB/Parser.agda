@@ -218,7 +218,9 @@ checkOutputDeclarations Γ (x ∷ xs) = do
   xs' ← traverseTCMList (checkOutputDeclaration Γ) xs
   return (x' ∷ xs')
 
-postulate checkEquivalenceStatement : (Γ : NetworkContext) → List B.NetworkEquivalence → TCM (NetworkEquivalence Γ)
+-- TODO: return the correct network "pointer"
+postulate checkEquivalenceStatement : (Γ : NetworkContext) → List B.NetworkEquivalence → TCM (Maybe (NetworkEquivalence Γ))
+
 
 checkNetworkDeclaration : ∀ Γ → B.NetworkDefinition → TCM (NetworkDeclaration Γ)
 checkNetworkDeclaration Γ (B.networkDef varName equivs inputs hidden outputs) = do
@@ -228,7 +230,7 @@ checkNetworkDeclaration Γ (B.networkDef varName equivs inputs hidden outputs) =
   hidden ← checkHiddenDeclarations Γ hidden
   outputs ← checkOutputDeclarations Γ outputs
   equivalence ← checkEquivalenceStatement Γ equivs
-  let decl = declareNetwork name inputs hidden outputs equivalence
+  let decl = declareNetwork name equivalence inputs hidden outputs
   checkNamesLocallyUnique decl
   return decl
 
