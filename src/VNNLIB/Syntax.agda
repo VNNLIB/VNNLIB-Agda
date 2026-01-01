@@ -11,7 +11,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.NonEmpty.Base as List⁺ using (List⁺)
 open import Data.List.NonEmpty.Relation.Unary.All using () renaming (All to All⁺)
 open import Data.String.Base using (String)
-open import Data.Maybe using (Maybe)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Fin.Base as Fin using (Fin)
 open import Data.Vec.Base as Vec using (Vec; []; _∷_)
 open import Data.Bool.Base using (Bool)
@@ -123,6 +123,19 @@ mutual
 
   typeOfNetwork : ∀ {Γ} → NetworkDeclaration Γ → NetworkType ElementType
   typeOfNetwork d = networkType (typeOfInputs d) (typeOfOutputs d)
+
+  data NetworkShape : Set where
+    networkShape : (inputShapes : List⁺ TensorShape) → (outputShapes : List⁺ TensorShape) → NetworkShape
+
+  shapeOfInputs : ∀ {Γ} → NetworkDeclaration Γ → List⁺ TensorShape
+  shapeOfInputs d = List⁺.map (λ z → z .inputType .TensorType.tensorDims ) (NetworkDeclaration.inputDeclarations d)
+
+  shapeOfOutputs : ∀ {Γ} → NetworkDeclaration Γ → List⁺ TensorShape
+  shapeOfOutputs d = List⁺.map (λ z → z .outputType .TensorType.tensorDims ) (NetworkDeclaration.outputDeclarations d)
+
+  shapeOfNetwork : ∀ {Γ} → NetworkDeclaration Γ → NetworkShape
+  shapeOfNetwork d = networkShape (shapeOfInputs d) (shapeOfOutputs d)
+
   
   ---------------------------------------
   -- Restrictions on network variables --
@@ -131,10 +144,23 @@ mutual
   NetworkPredicate : Set₁
   NetworkPredicate = IPred NetworkDeclaration 0ℓ
 
-  postulate ValidEqualToTarget : NetworkPredicate
+  data IsomorphicNetwork : ∀ {Γ} → NetworkDeclaration Γ → Set where
+    isIsomorphicNetwork : ∀ {Γ name target inputs hidden outputs} → IsomorphicNetwork {Γ} (declareNetwork name (just (isomorphic-to target)) inputs hidden outputs)
 
-  postulate ValidIsomorphicToTarget : NetworkPredicate
+  data EqualNetwork : ∀ {Γ} → NetworkDeclaration Γ → Set where
+    isEqualNetwork : ∀ {Γ name target inputs hidden outputs} → EqualNetwork {Γ} (declareNetwork name (just (equal-to target)) inputs hidden outputs)
 
+  data NotEqualNetwork : ∀ {Γ} → NetworkDeclaration Γ → Set where
+    isNotEqualNetwork : ∀ {Γ name inputs hidden outputs} → NotEqualNetwork {Γ} (declareNetwork name (nothing) inputs hidden outputs)
+  
+  -- A valid equal network reference has the same network type
+  ValidEqualToTarget : NetworkPredicate
+  ValidEqualToTarget network =  Σ (NetworkType ElementType) (λ type → NotEqualNetwork network × typeOfNetwork network ≡ type)
+ 
+  -- A valid isomorphic network reference has the same network shape
+  ValidIsomorphicToTarget : NetworkPredicate
+  ValidIsomorphicToTarget network = Σ (NetworkShape) (λ shape → NotEqualNetwork network × shapeOfNetwork network ≡ shape)
+ 
   -----------------------
   -- Network variables --
   -----------------------

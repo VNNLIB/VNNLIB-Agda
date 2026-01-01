@@ -52,11 +52,6 @@ SingleNetworkTheory (query networks _) = SingleNetwork networks
 -----------
 -- MENET --
 -----------
-data EqualNetwork : ∀ {Γ} → NetworkDeclaration Γ → Set where
-  isEqualNetwork : ∀ {Γ name target inputs hidden outputs} → EqualNetwork {Γ} (declareNetwork name (just (equal-to target)) inputs hidden outputs)
-
-data NotEqualNetwork : ∀ {Γ} → NetworkDeclaration Γ → Set where
-  isEqualNetwork : ∀ {Γ name target inputs hidden outputs} → NotEqualNetwork {Γ} (declareNetwork name (just (equal-to target)) inputs hidden outputs)
 
 -- A query where all networks are equal
 MultipleEqualNetworks : NetworksPredicate
@@ -70,8 +65,6 @@ MultipleEqualNetworksTheory (query networks _) = MultipleEqualNetworks networks
 -----------
 -- MINET --
 -----------
-data IsomorphicNetwork : ∀ {Γ} → NetworkDeclaration Γ → Set where
-  isIsomorphicNetwork : ∀ {Γ name target inputs hidden outputs} → IsomorphicNetwork {Γ} (declareNetwork name (just (isomorphic-to target)) inputs hidden outputs)
 
 -- A network that is equal to another network is also in the isomorphic theory
 MultipleIsomorphicNetworks : NetworksPredicate
