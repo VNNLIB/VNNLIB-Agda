@@ -132,6 +132,37 @@ allVariablesDeclared : NetworkContext → List Name
 allVariablesDeclared [] = []
 allVariablesDeclared (Γ ∷ x) = variablesDeclared x List.++ allVariablesDeclared Γ
 
+-- TODO: Add proofs
+postulate isNetworkTypeEqual : (type₁ : NetworkType ElementType) → (type₂ : NetworkType ElementType) → Maybe (type₁ ≡ type₂)
+postulate isNetworkShapeEqual : (shape₁ : NetworkShape) → (shape₂ : NetworkShape) → Maybe (shape₁ ≡ shape₂)
+
+lookupEqualNetwork :
+  (Γ : NetworkContext) →
+  (type : NetworkType ElementType) →
+  (name : B.VariableName) →
+  Maybe (EqualNetworkVariable Γ)
+lookupEqualNetwork [] _ _ = nothing
+lookupEqualNetwork (Γ ∷ d) type name with networkName d String.≟ getVariableName name | d
+... | no  _ | _ = Maybe.map there (lookupEqualNetwork Γ type name)
+... | yes p | declareNetwork _ (just _) _ _ _ = nothing
+... | yes p | d@(declareNetwork _ nothing _ _ _) with isNetworkTypeEqual (typeOfNetwork d) type
+... | just eq = just (here (type , isNotEqualNetwork , eq))
+... | nothing = nothing
+
+lookupIsomorphicNetwork :
+  (Γ : NetworkContext) →
+  (shape : NetworkShape) →
+  (name : B.VariableName) →
+  Maybe (IsomorphicNetworkVariable Γ)
+lookupIsomorphicNetwork [] _ _ = nothing
+lookupIsomorphicNetwork (Γ ∷ d) shape name with networkName d String.≟ getVariableName name | d
+... | no  _ | _ = Maybe.map there (lookupIsomorphicNetwork Γ shape name)
+... | yes p | declareNetwork _ (just _) _ _ _ = nothing
+... | yes p | d@(declareNetwork _ nothing _ _ _) with isNetworkShapeEqual (shapeOfNetwork d) shape
+... | just eq = just (here (shape , isNotEqualNetwork , eq))
+... | nothing = nothing
+
+
 -----------------
 -- Declarations --
 -----------------
@@ -218,8 +249,17 @@ checkOutputDeclarations Γ (x ∷ xs) = do
   xs' ← traverseTCMList (checkOutputDeclaration Γ) xs
   return (x' ∷ xs')
 
--- TODO: return the correct network "pointer"
-postulate checkEquivalenceStatement : (Γ : NetworkContext) → List B.NetworkEquivalence → TCM (Maybe (NetworkEquivalence Γ))
+
+-- TODO:  List B.NetworkEquivalence should not be allowable in the grammar so it should be a single equivalence statement statement check
+checkEquivalenceStatement : (Γ : NetworkContext) → List B.NetworkEquivalence → NetworkDeclaration [] → TCM (Maybe (NetworkEquivalence Γ))
+checkEquivalenceStatement Γ [] _ = return nothing
+checkEquivalenceStatement Γ (B.isomorphicTo x ∷ []) decl' with lookupIsomorphicNetwork Γ (shapeOfNetwork decl') x
+... | just target = return (just (isomorphic-to target))
+... | nothing = throw "Invalid Isomorphic Network target"
+checkEquivalenceStatement Γ (B.equalTo x ∷ []) decl' with lookupEqualNetwork Γ (typeOfNetwork decl') x
+... | just target = return (just (equal-to target))
+... | nothing = throw "Invalid Equal Network target"
+checkEquivalenceStatement Γ (x ∷ x₁ ∷ equivs) _ = throw "Must at most have one equivalence statement"
 
 
 checkNetworkDeclaration : ∀ Γ → B.NetworkDefinition → TCM (NetworkDeclaration Γ)
@@ -229,7 +269,7 @@ checkNetworkDeclaration Γ (B.networkDef varName equivs inputs hidden outputs) =
   inputs ← checkInputDeclarations Γ inputs
   hidden ← checkHiddenDeclarations Γ hidden
   outputs ← checkOutputDeclarations Γ outputs
-  equivalence ← checkEquivalenceStatement Γ equivs
+  equivalence ← checkEquivalenceStatement Γ equivs (declareNetwork name nothing inputs hidden outputs)
   let decl = declareNetwork name equivalence inputs hidden outputs
   checkNamesLocallyUnique decl
   return decl
