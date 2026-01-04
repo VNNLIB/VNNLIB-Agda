@@ -56,7 +56,7 @@ SingleNetworkTheory (query networks _) = SingleNetwork networks
 -- A query where all networks are equal
 MultipleEqualNetworks : NetworksPredicate
 MultipleEqualNetworks [] = ⊥ -- TODO: sort out empty context
-MultipleEqualNetworks (networks ∷ x) = NotEqualNetwork x × AllNetworks EqualNetwork networks
+MultipleEqualNetworks (networks ∷ x) = NonEquivalentNetwork x × AllNetworks EqualNetwork networks
 
 -- A query that lives in the MENET theory
 MultipleEqualNetworksTheory : Theory
@@ -69,7 +69,7 @@ MultipleEqualNetworksTheory (query networks _) = MultipleEqualNetworks networks
 -- A network that is equal to another network is also in the isomorphic theory
 MultipleIsomorphicNetworks : NetworksPredicate
 MultipleIsomorphicNetworks [] = ⊥ -- TODO: sort out empty context
-MultipleIsomorphicNetworks (networks ∷ x) = NotEqualNetwork x × AllNetworks TheoryIsomorphicNetwork networks
+MultipleIsomorphicNetworks (networks ∷ x) = NonEquivalentNetwork x × AllNetworks TheoryIsomorphicNetwork networks
   where
     TheoryIsomorphicNetwork : NetworkPredicate
     TheoryIsomorphicNetwork network = IsomorphicNetwork network ⊎ EqualNetwork network
