@@ -61,9 +61,6 @@ numberRep (B.number (B.#pair pos name)) = name
 -- Context --
 -------------
 
-liftNetwork : ∀ {Γ} (n : NetworkDeclaration Γ) → NetworkDeclaration Γ → NetworkDeclaration (Γ ∷ n)
-liftNetwork _ (declareNetwork name inputs hidden outputs) = declareNetwork name inputs hidden outputs
-
 TensorVarResult : NetworkContext → Set
 TensorVarResult Γ = Σ (TensorType ElementType) (λ τ → InputVariable Γ τ ⊎ HiddenVariable Γ τ ⊎ OutputVariable Γ τ)
 
@@ -135,6 +132,38 @@ allVariablesDeclared : NetworkContext → List Name
 allVariablesDeclared [] = []
 allVariablesDeclared (Γ ∷ x) = variablesDeclared x List.++ allVariablesDeclared Γ
 
+-- TODO: Add proofs
+postulate isNetworkTypeEqual : (type₁ : NetworkType ElementType) → (type₂ : NetworkType ElementType) → Maybe (type₁ ≡ type₂)
+postulate isNetworkShapeEqual : (shape₁ : NetworkShape) → (shape₂ : NetworkShape) → Maybe (shape₁ ≡ shape₂)
+
+checkTargetNetworkEquivStatements : ∀ {Γ} → (d : NetworkDeclaration Γ) → Maybe (NonEquivalentNetwork d)
+checkTargetNetworkEquivStatements (declareNetwork _ _ _ _ equiv) with equiv
+... | just x = nothing
+... | nothing = just isNonEquivalentNetwork
+
+lookupEqualNetwork :
+  (Γ : NetworkContext) →
+  (name : B.VariableName) →
+  (type : NetworkType ElementType) →
+  Maybe (EqualNetworkVariable Γ type)
+lookupEqualNetwork [] _ _ = nothing
+lookupEqualNetwork (Γ ∷ d) name type with networkName d String.≟ getVariableName name | checkTargetNetworkEquivStatements d | isNetworkTypeEqual (typeOfNetwork d) type
+... | no _  | _       | _       = Maybe.map there (lookupEqualNetwork Γ name type)
+... | yes _ | just e₁ | just e₂ = just (here (e₁ , e₂))
+... | yes _ | _       | _       = nothing
+
+lookupIsomorphicNetwork :
+  (Γ : NetworkContext) →
+  (name : B.VariableName) →
+  (type : NetworkType ElementType) →
+  Maybe (IsomorphicNetworkVariable Γ type)
+lookupIsomorphicNetwork [] _ _ = nothing
+lookupIsomorphicNetwork (Γ ∷ d) name type
+  with networkName d String.≟ getVariableName name | checkTargetNetworkEquivStatements d | isNetworkShapeEqual (shapeOfNetwork (typeOfNetwork d)) (shapeOfNetwork type)
+... | no _  | _       | _       = Maybe.map there (lookupIsomorphicNetwork Γ name type)
+... | yes _ | just e₁ | just e₂ = just (here (e₁ , e₂))
+... | yes _ | _       | _       = nothing
+
 -----------------
 -- Declarations --
 -----------------
@@ -177,10 +206,20 @@ checkElementType : B.ElementType → TCM ElementType
 checkElementType (B.dType τ) with Theory.readElementType (getVariableName τ)
 ... | just r  = return r
 ... | nothing = throw "Could not parse type"
+    
+checkEquivalenceStatement : (Γ : NetworkContext) → B.NetworkEquivalence → (type : NetworkType ElementType) → TCM (Maybe (NetworkEquivalence Γ type))
+checkEquivalenceStatement Γ (B.isomorphicTo x) type with lookupIsomorphicNetwork Γ x type
+... | just e = return (just (isomorphic-to e))
+... | nothing = throw "Could not parse isomorphic Equivalence statement"
+checkEquivalenceStatement Γ (B.equalTo x) type with lookupEqualNetwork Γ x type
+... | just e = return (just (equal-to e))
+... | nothing = throw "Could not parse equal Equivalence statement"
 
-checkEquivalenceStatements : List B.NetworkEquivalence → TCM ⊤
-checkEquivalenceStatements [] = return _
-checkEquivalenceStatements (_ ∷ _) = unsupported "equivalence statements"
+-- TODO:  List B.NetworkEquivalence should not be allowable in the grammar so it should be a single equivalence statement statement check
+checkEquivalenceStatements : (Γ : NetworkContext) → List B.NetworkEquivalence → (type : NetworkType ElementType) → TCM (Maybe (NetworkEquivalence Γ type))
+checkEquivalenceStatements Γ [] _ = return nothing
+checkEquivalenceStatements Γ (x ∷ []) type = checkEquivalenceStatement Γ x type
+checkEquivalenceStatements Γ (x ∷ x₁ ∷ equivs) _ = throw "Must at most have one equivalence statement"
 
 checkInputDeclaration : NetworkContext → B.InputDefinition → TCM (InputDeclaration)
 checkInputDeclaration Γ (B.inputDef varName τ shape) = do
@@ -224,11 +263,11 @@ checkOutputDeclarations Γ (x ∷ xs) = do
 checkNetworkDeclaration : ∀ Γ → B.NetworkDefinition → TCM (NetworkDeclaration Γ)
 checkNetworkDeclaration Γ (B.networkDef varName equivs inputs hidden outputs) = do
   name ← checkNameUnique Γ varName
-  checkEquivalenceStatements equivs
   inputs ← checkInputDeclarations Γ inputs
   hidden ← checkHiddenDeclarations Γ hidden
   outputs ← checkOutputDeclarations Γ outputs
-  let decl = declareNetwork name inputs hidden outputs
+  equivalence ← checkEquivalenceStatements Γ equivs (typeOfNetworkRecord inputs outputs)
+  let decl = declareNetwork name inputs hidden outputs equivalence
   checkNamesLocallyUnique decl
   return decl
 

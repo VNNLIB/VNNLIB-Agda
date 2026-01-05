@@ -11,6 +11,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.NonEmpty.Base as List⁺ using (List⁺)
 open import Data.List.NonEmpty.Relation.Unary.All using () renaming (All to All⁺)
 open import Data.String.Base using (String)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Fin.Base as Fin using (Fin)
 open import Data.Vec.Base as Vec using (Vec; []; _∷_)
 open import Data.Bool.Base using (Bool)
@@ -95,13 +96,16 @@ mutual
   ------------------------
   
   record NetworkDeclaration (Γ : NetworkContext) : Set where
+    inductive
     constructor declareNetwork
     field
       networkName        : Name
       inputDeclarations  : List⁺ InputDeclaration
       hiddenDeclarations : List HiddenDeclaration
       outputDeclarations : List⁺ OutputDeclaration
+      equivalence        : Maybe (NetworkEquivalence Γ (typeOfNetworkRecord inputDeclarations outputDeclarations))
 
+ 
   typeOfInputs : ∀ {Γ} → NetworkDeclaration Γ → InputTypes ElementType
   typeOfInputs d = List⁺.map inputType (NetworkDeclaration.inputDeclarations d)
 
@@ -113,6 +117,27 @@ mutual
 
   typeOfNetwork : ∀ {Γ} → NetworkDeclaration Γ → NetworkType ElementType
   typeOfNetwork d = networkType (typeOfInputs d) (typeOfOutputs d)
+
+  typeOfNetworkRecord : List⁺ InputDeclaration → List⁺ OutputDeclaration → NetworkType ElementType
+  typeOfNetworkRecord inputs outputs = networkType (List⁺.map inputType inputs) (List⁺.map outputType outputs)
+
+  data NetworkShape : Set where
+    networkShape : (inputShapes : List⁺ TensorShape) → (outputShapes : List⁺ TensorShape) → NetworkShape
+
+  shapeOfNetwork : NetworkType ElementType → NetworkShape
+  shapeOfNetwork (networkType inputs outputs) = networkShape shapeOfInputs shapeOfOutputs
+     where
+       shapeOfInputs  : List⁺ TensorShape
+       shapeOfInputs  = List⁺.map (λ z → z .TensorType.tensorDims) inputs
+       shapeOfOutputs : List⁺ TensorShape
+       shapeOfOutputs = List⁺.map (λ z → z .TensorType.tensorDims) outputs
+  
+  ----------------------------------
+  -- Network congruence statement --
+  ----------------------------------
+  data NetworkEquivalence (Γ : NetworkContext) (type : NetworkType ElementType) : Set where
+    equal-to      : EqualNetworkVariable Γ type → NetworkEquivalence Γ type
+    isomorphic-to : IsomorphicNetworkVariable Γ type → NetworkEquivalence Γ type
   
   ---------------------------------------
   -- Restrictions on network variables --
@@ -121,10 +146,23 @@ mutual
   NetworkPredicate : Set₁
   NetworkPredicate = IPred NetworkDeclaration 0ℓ
 
-  postulate ValidEqualToTarget : NetworkPredicate
+  data IsomorphicNetwork : ∀ {Γ} → NetworkDeclaration Γ → Set where
+    isIsomorphicNetwork : ∀ {Γ name inputs hidden outputs target} → IsomorphicNetwork {Γ} (declareNetwork name inputs hidden outputs (just (isomorphic-to target)))
 
-  postulate ValidIsomorphicToTarget : NetworkPredicate
+  data EqualNetwork : ∀ {Γ} → NetworkDeclaration Γ → Set where
+    isEqualNetwork : ∀ {Γ name inputs hidden outputs target} → EqualNetwork {Γ} (declareNetwork name inputs hidden outputs (just (equal-to target)))
 
+  data NonEquivalentNetwork : ∀ {Γ} → NetworkDeclaration Γ → Set where
+    isNonEquivalentNetwork : ∀ {Γ name inputs hidden outputs} → NonEquivalentNetwork {Γ} (declareNetwork name inputs hidden outputs nothing)
+  
+  -- A valid equal network reference has the same network type
+  ValidEqualToTarget : NetworkType ElementType → NetworkPredicate
+  ValidEqualToTarget type target = NonEquivalentNetwork target × typeOfNetwork target ≡ type
+ 
+  -- A valid isomorphic network reference has the same network shape
+  ValidIsomorphicToTarget : NetworkType ElementType → NetworkPredicate
+  ValidIsomorphicToTarget type target = let targetType = typeOfNetwork target in NonEquivalentNetwork target × shapeOfNetwork targetType ≡ shapeOfNetwork type
+ 
   -----------------------
   -- Network variables --
   -----------------------
@@ -135,12 +173,12 @@ mutual
     there : ∀ {ns n} → AnyNetwork P ns → AnyNetwork P (ns ∷ n)
 
   -- A reference to a network that is equal to the current network
-  EqualNetworkVariable : NetworkContext → Set
-  EqualNetworkVariable = AnyNetwork ValidEqualToTarget
+  EqualNetworkVariable : NetworkContext → NetworkType ElementType → Set
+  EqualNetworkVariable Γ type = AnyNetwork (ValidEqualToTarget type) Γ
 
   -- A reference to a network that is isomorphic to the current network
-  IsomorphicNetworkVariable : NetworkContext → Set
-  IsomorphicNetworkVariable = AnyNetwork ValidIsomorphicToTarget
+  IsomorphicNetworkVariable : NetworkContext → NetworkType ElementType → Set
+  IsomorphicNetworkVariable Γ type = AnyNetwork (ValidIsomorphicToTarget type) Γ
 
 open NetworkDeclaration public
 
