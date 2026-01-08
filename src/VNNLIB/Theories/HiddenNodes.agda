@@ -28,7 +28,7 @@ NoHiddenNodes network = length (hiddenDeclarations network) ≡ 0
 
 -- A query lives in the NH theory 
 NoHiddenNodesTheory : Theory
-NoHiddenNodesTheory (query networks _) = AllNetworks NoHiddenNodes networks
+NoHiddenNodesTheory (query networks _) = AllNetworks NoHiddenNodes (toNetworkContext networks)
 
 
 -------

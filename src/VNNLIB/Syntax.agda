@@ -85,12 +85,12 @@ mutual
 
   ----------------------
   -- Network contexts --
-  ----------------------
+  ---------------------- 
 
   data NetworkContext : Set where
     [] : NetworkContext
     _∷_ : (Γ : NetworkContext) → NetworkDeclaration Γ → NetworkContext
-
+  
   ------------------------
   -- Network definition --
   ------------------------
@@ -138,7 +138,7 @@ mutual
   data NetworkEquivalence (Γ : NetworkContext) (type : NetworkType ElementType) : Set where
     equal-to      : EqualNetworkVariable Γ type → NetworkEquivalence Γ type
     isomorphic-to : IsomorphicNetworkVariable Γ type → NetworkEquivalence Γ type
-  
+
   ---------------------------------------
   -- Restrictions on network variables --
   ---------------------------------------
@@ -287,6 +287,16 @@ module _ (Γ : NetworkContext) where
   data Assertion : Set where
     assert : BoolExpr → Assertion
 
+------------------------------------------
+-- Network Context non-empty constraint --
+------------------------------------------
+
+data NetworkContext⁺ : Set where
+  _∷⁺_ : (Γ : NetworkContext) → (d : NetworkDeclaration Γ) → NetworkContext⁺ 
+
+toNetworkContext : NetworkContext⁺  → NetworkContext
+toNetworkContext (Γ ∷⁺ d) = Γ ∷ d
+
 -------------
 -- Queries --
 -------------
@@ -294,8 +304,8 @@ module _ (Γ : NetworkContext) where
 record Query : Set where
   constructor query
   field
-    context : NetworkContext
-    assertions : List (Assertion context)
+    context : NetworkContext⁺
+    assertions : List (Assertion (toNetworkContext context))
 
 open Query public
 

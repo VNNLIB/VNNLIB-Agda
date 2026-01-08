@@ -17,7 +17,7 @@ open import VNNLIB.Semantics onnxSemantics
 Solver : Set
 Solver =
   (q : Query) →
-  (N : NetworkImplementations (context q)) →
+  (N : NetworkImplementations (toNetworkContext(context q))) →
   Dec (⟦query⟧ q N)
 
 -- A solver is an incomplete decision procedure that decides the
@@ -25,5 +25,5 @@ Solver =
 IncompleteSolver : Set
 IncompleteSolver =
   (q : Query) →
-  (N : NetworkImplementations (context q)) →
+  (N : NetworkImplementations (toNetworkContext(context q))) →
   Maybe (⟦query⟧ q N)
