@@ -33,7 +33,7 @@ SingleInputOutput network =
 -- A query lives in the SIO theory 
 SingleInputsOutputsTheory : Theory
 SingleInputsOutputsTheory (query networks _) =
-  AllNetworks SingleInputOutput networks
+  AllNetworks SingleInputOutput (toNetworkContext networks)
 
 ---------
 -- MIO --

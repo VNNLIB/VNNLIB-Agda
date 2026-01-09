@@ -8,7 +8,7 @@ module VNNLIB.Parser
 
 open import Data.List as List using (List; []; _∷_)
 open import Data.List.Properties using (length-map)
-open import Data.List.NonEmpty as List⁺
+open import Data.List.NonEmpty as List⁺ hiding (_∷⁺_)
 open import Data.Bool as Bool
 open import Data.String as String using (String; _==_)
 open import Relation.Binary.PropositionalEquality
@@ -271,12 +271,13 @@ checkNetworkDeclaration Γ (B.networkDef varName equivs inputs hidden outputs) =
   checkNamesLocallyUnique decl
   return decl
 
-checkNetworks : List B.NetworkDefinition → TCM NetworkContext
-checkNetworks [] = return []
+checkNetworks : List B.NetworkDefinition → TCM NetworkContext⁺
+checkNetworks [] = throw "Must be at least one Network Declaration"
 checkNetworks (n ∷ ns) = do
   ns' ← checkNetworks ns
-  n' ← checkNetworkDeclaration ns' n
-  return (ns' ∷ n')
+  let ns'' = toNetworkContext ns'
+  n' ← checkNetworkDeclaration ns'' n
+  return (ns'' ∷⁺ n')
 
 ----------------
 -- Assertions --
@@ -376,7 +377,7 @@ module _ (Γ : NetworkContext) where
 checkQuery : B.Query → TCM Query
 checkQuery (B.vNNLibQuery ver networks assertions) = do
   networks' ← checkNetworks networks
-  assertions' ← checkAssertions networks' assertions
+  assertions' ← checkAssertions (toNetworkContext networks') assertions
   return (query networks' assertions')
 
 parseQuery : String → String ⊎ Query

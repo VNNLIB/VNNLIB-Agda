@@ -165,10 +165,10 @@ module _ (Δ : Environment Γ) where
 -------------
 
 QuerySemantics : Set₁
-QuerySemantics = (q : Query) → NetworkImplementations (context q) → Set
+QuerySemantics = (q : Query) → NetworkImplementations (toNetworkContext (context q)) → Set
 
 ⟦query⟧ : QuerySemantics
 ⟦query⟧ (query Γ assertions) networks =
-  ∃ λ (assignment : InputAssignments Γ) →
+  ∃ λ (assignment : InputAssignments (toNetworkContext Γ)) →
     let Δ = createEnvironment networks assignment in
     True (⟦assertionList⟧ Δ assertions)

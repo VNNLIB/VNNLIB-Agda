@@ -21,7 +21,7 @@ open import VNNLIB.Theories.Definition networkSyntax
 
 
 NetworksPredicate : Set₁
-NetworksPredicate = Pred NetworkContext 0ℓ
+NetworksPredicate = Pred NetworkContext⁺ 0ℓ
 
 ----------------
 -- Theory set --
@@ -38,13 +38,12 @@ data MultipleNetworks : Set where
 ----------  
 
 SingleNetwork : NetworksPredicate
-SingleNetwork networks = networkContextLength networks ≡ 1
+SingleNetwork networks = networkContextLength (toNetworkContext networks) ≡ 1
   where
     networkContextLength : NetworkContext → ℕ
     networkContextLength [] = ℕ.zero
     networkContextLength (Γ ∷ x) = ℕ.suc (networkContextLength Γ)
-
-
+    
 -- A query that lives in the SNET theory
 SingleNetworkTheory : Theory
 SingleNetworkTheory (query networks _) = SingleNetwork networks
@@ -55,8 +54,7 @@ SingleNetworkTheory (query networks _) = SingleNetwork networks
 
 -- A query where all networks are equal
 MultipleEqualNetworks : NetworksPredicate
-MultipleEqualNetworks [] = ⊥ -- TODO: sort out empty context
-MultipleEqualNetworks (networks ∷ x) = NonEquivalentNetwork x × AllNetworks EqualNetwork networks
+MultipleEqualNetworks (networks ∷⁺ x) = NonEquivalentNetwork x × AllNetworks EqualNetwork networks
 
 -- A query that lives in the MENET theory
 MultipleEqualNetworksTheory : Theory
@@ -68,8 +66,7 @@ MultipleEqualNetworksTheory (query networks _) = MultipleEqualNetworks networks
 
 -- A network that is equal to another network is also in the isomorphic theory
 MultipleIsomorphicNetworks : NetworksPredicate
-MultipleIsomorphicNetworks [] = ⊥ -- TODO: sort out empty context
-MultipleIsomorphicNetworks (networks ∷ x) = NonEquivalentNetwork x × AllNetworks TheoryIsomorphicNetwork networks
+MultipleIsomorphicNetworks (networks ∷⁺ x) = NonEquivalentNetwork x × AllNetworks TheoryIsomorphicNetwork networks
   where
     TheoryIsomorphicNetwork : NetworkPredicate
     TheoryIsomorphicNetwork network = IsomorphicNetwork network ⊎ EqualNetwork network
