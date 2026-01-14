@@ -4,58 +4,19 @@ module VNNLIB.Theories.ArithmeticComplexity
   (networkSyntax : NetworkTheorySyntax)
   where
 
-open import Data.Nat using (ℕ)
 open import Data.Unit.Base using (⊤)
 open import Data.Empty using (⊥)
 open import Data.List using (List; length; []; _∷_ )
-open import Data.List.NonEmpty
-open import Data.Product.Base using (_×_;_,_)
+open import Data.List.NonEmpty using (List⁺) renaming (_∷_ to _∷⁺_)  
 open import Data.Sum using (_⊎_)
-open import Relation.Unary
+open import Data.Product.Base using (_×_)
+open import Relation.Unary using (U)
 open import Relation.Binary.PropositionalEquality using (_≡_)
-open import Level
-open import Relation.Unary.Indexed using (IPred)
-open import Data.List.Relation.Unary.All using (All)
-open import Data.Maybe using (just; nothing)
 
 
 open import VNNLIB.Syntax networkSyntax
 open import VNNLIB.Theories.Definition networkSyntax
 
-
-AssertionPredicate : Set₁
-AssertionPredicate = IPred Assertion 0ℓ
-
-AllAssertions : AssertionPredicate → Query → Set
-AllAssertions P (query _ assertions) = All P assertions
-
-
--------------------------------------
--- Traverse Arithmetic Expressions --
--------------------------------------
-
-ArithExprPredicate : NetworkContext → Set₁
-ArithExprPredicate Γ = IPred (ArithExpr Γ) 0ℓ
-
-module _ (Γ : NetworkContext) (P₁ P₂ : ArithExprPredicate Γ) where
-  checkCompExpr : ∀ {τ} → CompExpr Γ τ → Set
-  checkCompExpr (greaterThan x x₁)  = P₁ x × P₂ x₁
-  checkCompExpr (lessThan x x₁)     = P₁ x × P₂ x₁
-  checkCompExpr (greaterEqual x x₁) = P₁ x × P₂ x₁
-  checkCompExpr (lessEqual x x₁)    = P₁ x × P₂ x₁
-  checkCompExpr (notEqual x x₁)     = P₁ x × P₂ x₁
-  checkCompExpr (equal x x₁)        = P₁ x × P₂ x₁
-  
-  mutual
-    checkListBoolExpr : List (BoolExpr Γ) → Set
-    checkListBoolExpr [] = ⊤
-    checkListBoolExpr (x ∷ a) = checkBoolExpr x × checkListBoolExpr a
-  
-    checkBoolExpr : BoolExpr Γ → Set
-    checkBoolExpr (literal x) = ⊤
-    checkBoolExpr (comparison (_ , snd)) = checkCompExpr snd
-    checkBoolExpr (and x) = checkBoolExpr (x .head) × checkListBoolExpr (x .tail)
-    checkBoolExpr (or x)  = checkBoolExpr (x .head) × checkListBoolExpr (x .tail)
 
 ----------------
 -- Theory set --
@@ -72,7 +33,7 @@ data ArithmeticComplexity : Set where
 ----------
 
 ConstantArithExpr : ∀ {Γ} → ArithExprPredicate Γ
-ConstantArithExpr (constant _) = ⊤
+ConstantArithExpr (constant x) = ⊤
 ConstantArithExpr _ = ⊥
 
 VarArithExpr : ∀ {Γ} → ArithExprPredicate Γ
@@ -106,20 +67,63 @@ OutputComparisonsTheory : Theory
 OutputComparisonsTheory = AllAssertions OutputComparisons
 
 
------------
+----------
 -- LIN --
------------
+----------
 
-LinearExpression : ∀ {Γ} → ArithExprPredicate Γ
-LinearExpression a = {!!}
+-- Determine if an Arithmetic expression has an embedded variable
+mutual
+  EmbeddedVarArithExpr : ∀ {Γ} → ArithExprPredicate Γ
+  EmbeddedVarArithExpr (constant x) = ⊥
+  EmbeddedVarArithExpr (negate a)   = EmbeddedVarArithExpr a
+  EmbeddedVarArithExpr (add x) = List⁺EmbeddedVarArithExpr x
+  EmbeddedVarArithExpr (sub x) = List⁺EmbeddedVarArithExpr x
+  EmbeddedVarArithExpr (mul x) = List⁺EmbeddedVarArithExpr x
+  EmbeddedVarArithExpr var     = VarArithExpr var
 
--- Assertion comparisons only include constants and variables
+  List⁺EmbeddedVarArithExpr : ∀ {Γ i} → List⁺ (ArithExpr Γ i) → Set
+  List⁺EmbeddedVarArithExpr (head ∷⁺ tail) = EmbeddedVarArithExpr head ⊎ ListEmbeddedVarArithExpr tail
+
+  ListEmbeddedVarArithExpr : ∀ {Γ i} → List (ArithExpr Γ i) → Set
+  ListEmbeddedVarArithExpr [] = ⊥
+  ListEmbeddedVarArithExpr (x ∷ xs) = EmbeddedVarArithExpr x ⊎ ListEmbeddedVarArithExpr xs 
+
+--- Determine if an Arithmetic expression is linear
+mutual
+  LinearExpression : ∀ {Γ} → ArithExprPredicate Γ
+  LinearExpression {Γ} (constant x)  = ConstantArithExpr {Γ} (constant x)
+  LinearExpression (negate a)    = LinearExpression a
+  LinearExpression (inputVar x)  = VarArithExpr (inputVar x)
+  LinearExpression (hiddenVar x) = VarArithExpr (hiddenVar x)
+  LinearExpression (outputVar x) = VarArithExpr (outputVar x)
+  LinearExpression (add x) = LinearList⁺ArithExpr x
+  LinearExpression (sub x) = LinearList⁺ArithExpr x
+  LinearExpression (mul x) = LinearList⁺ArithExpr-mult x
+
+  -- Multiplication must have at most 1 embedded variable for linearity
+  LinearList⁺ArithExpr-mult : ∀ {Γ i} → List⁺ (ArithExpr Γ i) → Set
+  LinearList⁺ArithExpr-mult (head ∷⁺ tail) = LinearListArithExpr-mult (head ∷ tail)
+    where
+      LinearListArithExpr-mult : ∀ {Γ i} → List (ArithExpr Γ i) → Set
+      LinearListArithExpr-mult [] = ⊤
+      LinearListArithExpr-mult (x ∷ xs) =
+        (EmbeddedVarArithExpr x × (ListEmbeddedVarArithExpr xs → ⊥)) ⊎ ((EmbeddedVarArithExpr x → ⊥) × LinearListArithExpr-mult xs)
+
+  -- Addition and subtraction are linear operations
+  LinearList⁺ArithExpr : ∀ {Γ i} → List⁺ (ArithExpr Γ i) → Set
+  LinearList⁺ArithExpr (head ∷⁺ tail) = LinearExpression head × LinearListArithExpr tail
+    where
+      LinearListArithExpr : ∀ {Γ i} → List (ArithExpr Γ i) → Set
+      LinearListArithExpr [] = ⊤
+      LinearListArithExpr (x ∷ xs) = LinearExpression x × LinearListArithExpr xs
+  
+-- Assertion comparisons are betweeen linear expressions
 LinearArithmetic : AssertionPredicate
 LinearArithmetic {Γ} (assert x) = checkBoolExpr Γ LinearExpression LinearExpression x
 
 -- A query that lives in the LIN theory
 LinearArithmeticTheory : Theory
-LinearArithmeticTheory = AllAssertions OutputComparisons
+LinearArithmeticTheory = AllAssertions LinearArithmetic
 
 ----------
 -- POLY --
