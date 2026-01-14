@@ -10,7 +10,7 @@ open import Data.Empty using (⊥)
 open import Data.List using (length)
 open import Data.Product.Base using (_×_)
 open import Data.Sum using (_⊎_)
-open import Relation.Unary
+open import Relation.Unary using (Pred)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Level
 open import Data.Maybe using (just; nothing)
@@ -19,9 +19,6 @@ open import Data.Maybe using (just; nothing)
 open import VNNLIB.Syntax networkSyntax
 open import VNNLIB.Theories.Definition networkSyntax
 
-
-NetworksPredicate : Set₁
-NetworksPredicate = Pred NetworkContext⁺ 0ℓ
 
 ----------------
 -- Theory set --
