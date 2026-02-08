@@ -7,12 +7,11 @@ module VNNLIB.Theories.ArithmeticComplexity
 open import Data.Unit.Base using (⊤)
 open import Data.Empty using (⊥)
 open import Data.List using (List; length; []; _∷_ )
-open import Data.List.NonEmpty using (List⁺) renaming (_∷_ to _∷⁺_)  
+open import Data.List.NonEmpty using (List⁺; toList) renaming (_∷_ to _∷⁺_)  
 open import Data.Sum using (_⊎_)
 open import Data.Product.Base using (_×_)
 open import Relation.Unary using (U)
 open import Relation.Binary.PropositionalEquality using (_≡_)
-
 
 open import VNNLIB.Syntax networkSyntax
 open import VNNLIB.Theories.Definition networkSyntax
@@ -71,22 +70,19 @@ OutputComparisonsTheory = AllAssertions OutputComparisons
 -- LIN --
 ----------
 
--- Determine if an Arithmetic expression has an embedded variable
+-- Arithmetic expression has an embedded variable
 mutual
   EmbeddedVarArithExpr : ∀ {Γ} → ArithExprPredicate Γ
   EmbeddedVarArithExpr (constant x) = ⊥
   EmbeddedVarArithExpr (negate a)   = EmbeddedVarArithExpr a
-  EmbeddedVarArithExpr (add x) = List⁺EmbeddedVarArithExpr x
-  EmbeddedVarArithExpr (sub x) = List⁺EmbeddedVarArithExpr x
-  EmbeddedVarArithExpr (mul x) = List⁺EmbeddedVarArithExpr x
-  EmbeddedVarArithExpr var     = VarArithExpr var
+  EmbeddedVarArithExpr (add (x ∷⁺ xs)) = EmbeddedVarArithExpr x ⊎ AnyEmbeddedVarArithExpr xs
+  EmbeddedVarArithExpr (sub (x ∷⁺ xs)) = EmbeddedVarArithExpr x ⊎ AnyEmbeddedVarArithExpr xs
+  EmbeddedVarArithExpr (mul (x ∷⁺ xs)) = EmbeddedVarArithExpr x ⊎ AnyEmbeddedVarArithExpr xs
+  EmbeddedVarArithExpr var     = VarArithExpr var 
 
-  List⁺EmbeddedVarArithExpr : ∀ {Γ i} → List⁺ (ArithExpr Γ i) → Set
-  List⁺EmbeddedVarArithExpr (head ∷⁺ tail) = EmbeddedVarArithExpr head ⊎ ListEmbeddedVarArithExpr tail
-
-  ListEmbeddedVarArithExpr : ∀ {Γ i} → List (ArithExpr Γ i) → Set
-  ListEmbeddedVarArithExpr [] = ⊥
-  ListEmbeddedVarArithExpr (x ∷ xs) = EmbeddedVarArithExpr x ⊎ ListEmbeddedVarArithExpr xs 
+  AnyEmbeddedVarArithExpr : ∀ {Γ i} → List (ArithExpr Γ i) → Set
+  AnyEmbeddedVarArithExpr [] = ⊥
+  AnyEmbeddedVarArithExpr (x ∷ xs) = EmbeddedVarArithExpr x ⊎ AnyEmbeddedVarArithExpr xs
 
 --- Determine if an Arithmetic expression is linear
 mutual
@@ -96,26 +92,14 @@ mutual
   LinearExpression (inputVar x)  = VarArithExpr (inputVar x)
   LinearExpression (hiddenVar x) = VarArithExpr (hiddenVar x)
   LinearExpression (outputVar x) = VarArithExpr (outputVar x)
-  LinearExpression (add x) = LinearList⁺ArithExpr x
-  LinearExpression (sub x) = LinearList⁺ArithExpr x
-  LinearExpression (mul x) = LinearList⁺ArithExpr-mult x
-
-  -- Multiplication must have at most 1 embedded variable for linearity
-  LinearList⁺ArithExpr-mult : ∀ {Γ i} → List⁺ (ArithExpr Γ i) → Set
-  LinearList⁺ArithExpr-mult (head ∷⁺ tail) = LinearListArithExpr-mult (head ∷ tail)
-    where
-      LinearListArithExpr-mult : ∀ {Γ i} → List (ArithExpr Γ i) → Set
-      LinearListArithExpr-mult [] = ⊤
-      LinearListArithExpr-mult (x ∷ xs) =
-        (EmbeddedVarArithExpr x × (ListEmbeddedVarArithExpr xs → ⊥)) ⊎ ((EmbeddedVarArithExpr x → ⊥) × LinearListArithExpr-mult xs)
+  LinearExpression (add (x ∷⁺ xs)) = LinearExpression x × AllLinearArithExpr xs
+  LinearExpression (sub (x ∷⁺ xs)) = LinearExpression x × AllLinearArithExpr xs
+  LinearExpression (mul x) = AtMostOne EmbeddedVarArithExpr (toList x)
 
   -- Addition and subtraction are linear operations
-  LinearList⁺ArithExpr : ∀ {Γ i} → List⁺ (ArithExpr Γ i) → Set
-  LinearList⁺ArithExpr (head ∷⁺ tail) = LinearExpression head × LinearListArithExpr tail
-    where
-      LinearListArithExpr : ∀ {Γ i} → List (ArithExpr Γ i) → Set
-      LinearListArithExpr [] = ⊤
-      LinearListArithExpr (x ∷ xs) = LinearExpression x × LinearListArithExpr xs
+  AllLinearArithExpr : ∀ {Γ τ} → List (ArithExpr Γ τ) → Set
+  AllLinearArithExpr [] = ⊤
+  AllLinearArithExpr (x ∷ x₁) = LinearExpression x × AllLinearArithExpr x₁
   
 -- Assertion comparisons are betweeen linear expressions
 LinearArithmetic : AssertionPredicate
