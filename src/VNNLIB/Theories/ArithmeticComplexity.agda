@@ -48,7 +48,7 @@ ConstantOrVarArithExpr x = ConstantArithExpr x ⊎ VarArithExpr x
 -- Assertion comparisons only include constants and variables, not comparing two variables
 BoundedVariables : AssertionPredicate
 BoundedVariables {Γ} (assert x) =
-  checkBoolExpr Γ ConstantArithExpr ConstantOrVarArithExpr x ⊎ checkBoolExpr Γ ConstantOrVarArithExpr ConstantArithExpr x
+  satisfiesArithExpr Γ ConstantArithExpr ConstantOrVarArithExpr x ⊎ satisfiesArithExpr Γ ConstantOrVarArithExpr ConstantArithExpr x
 
 -- A query that lives in the BND theory
 BoundedVariablesTheory : Theory
@@ -60,7 +60,7 @@ BoundedVariablesTheory = AllAssertions BoundedVariables
 
 -- Assertion comparisons only include constants and variables
 OutputComparisons : AssertionPredicate
-OutputComparisons {Γ} (assert x) = checkBoolExpr Γ ConstantOrVarArithExpr ConstantOrVarArithExpr x
+OutputComparisons {Γ} (assert x) = satisfiesArithExpr Γ ConstantOrVarArithExpr ConstantOrVarArithExpr x
 
 -- A query that lives in the OUTC theory
 OutputComparisonsTheory : Theory
@@ -119,7 +119,7 @@ mutual
   
 -- Assertion comparisons are betweeen linear expressions
 LinearArithmetic : AssertionPredicate
-LinearArithmetic {Γ} (assert x) = checkBoolExpr Γ LinearExpression LinearExpression x
+LinearArithmetic {Γ} (assert x) = satisfiesArithExpr Γ LinearExpression LinearExpression x
 
 -- A query that lives in the LIN theory
 LinearArithmeticTheory : Theory
