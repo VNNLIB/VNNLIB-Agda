@@ -22,6 +22,7 @@ It includes:
 | VNNLIB-Agda version | VNNLIB version |
 | --- | --- |
 | v1.0 | v2.0 |
+| v1.1 | v2.0 |
 
 ## Requirements
 
@@ -34,7 +35,7 @@ Later versions of these tools may work but are not tested.
 
 Agda does not yet have a good story for distributing libraries. Please follow the following instructions:
 
-1. Install the Agda standard library
+1. Install the [Agda standard library](https://github.com/agda/agda-stdlib/blob/master/doc/installation-guide.md)
 
 2. Clone this repository with submodules and navigate into it:
    ```bash
