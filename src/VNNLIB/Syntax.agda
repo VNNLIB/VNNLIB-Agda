@@ -11,11 +11,12 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.NonEmpty.Base as List⁺ using (List⁺)
 open import Data.List.NonEmpty.Relation.Unary.All using () renaming (All to All⁺)
 open import Data.String.Base using (String)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (Maybe; just; nothing; Is-nothing)
+import Data.Maybe.Relation.Unary.All as Maybe
 open import Data.Fin.Base as Fin using (Fin)
 open import Data.Vec.Base as Vec using (Vec; []; _∷_)
 open import Data.Bool.Base using (Bool)
-open import Data.Product.Base using (Σ; ∃; _×_; _,_)
+open import Data.Product.Base using (Σ; ∃; _×_; _,_; proj₂)
 open import Data.Unit.Base using (⊤)
 open import Level
 open import Relation.Unary.Indexed using (IPred)
@@ -105,7 +106,6 @@ mutual
       outputDeclarations : List⁺ OutputDeclaration
       equivalence        : Maybe (NetworkEquivalence Γ (typeOfNetworkRecord inputDeclarations outputDeclarations))
 
- 
   typeOfInputs : ∀ {Γ} → NetworkDeclaration Γ → InputTypes ElementType
   typeOfInputs d = List⁺.map inputType (NetworkDeclaration.inputDeclarations d)
 
@@ -121,20 +121,10 @@ mutual
   typeOfNetworkRecord : List⁺ InputDeclaration → List⁺ OutputDeclaration → NetworkType ElementType
   typeOfNetworkRecord inputs outputs = networkType (List⁺.map inputType inputs) (List⁺.map outputType outputs)
 
-  data NetworkShape : Set where
-    networkShape : (inputShapes : List⁺ TensorShape) → (outputShapes : List⁺ TensorShape) → NetworkShape
-
-  shapeOfNetwork : NetworkType ElementType → NetworkShape
-  shapeOfNetwork (networkType inputs outputs) = networkShape shapeOfInputs shapeOfOutputs
-     where
-       shapeOfInputs  : List⁺ TensorShape
-       shapeOfInputs  = List⁺.map (λ z → z .TensorType.tensorDims) inputs
-       shapeOfOutputs : List⁺ TensorShape
-       shapeOfOutputs = List⁺.map (λ z → z .TensorType.tensorDims) outputs
-  
   ----------------------------------
   -- Network congruence statement --
   ----------------------------------
+  
   data NetworkEquivalence (Γ : NetworkContext) (type : NetworkType ElementType) : Set where
     equal-to      : EqualNetworkVariable Γ type → NetworkEquivalence Γ type
     isomorphic-to : IsomorphicNetworkVariable Γ type → NetworkEquivalence Γ type
@@ -146,23 +136,20 @@ mutual
   NetworkPredicate : Set₁
   NetworkPredicate = IPred NetworkDeclaration 0ℓ
 
-  data IsomorphicNetwork : ∀ {Γ} → NetworkDeclaration Γ → Set where
-    isIsomorphicNetwork : ∀ {Γ name inputs hidden outputs target} → IsomorphicNetwork {Γ} (declareNetwork name inputs hidden outputs (just (isomorphic-to target)))
-
-  data EqualNetwork : ∀ {Γ} → NetworkDeclaration Γ → Set where
-    isEqualNetwork : ∀ {Γ name inputs hidden outputs target} → EqualNetwork {Γ} (declareNetwork name inputs hidden outputs (just (equal-to target)))
-
-  data NonEquivalentNetwork : ∀ {Γ} → NetworkDeclaration Γ → Set where
-    isNonEquivalentNetwork : ∀ {Γ name inputs hidden outputs} → NonEquivalentNetwork {Γ} (declareNetwork name inputs hidden outputs nothing)
-  
   -- A valid equal network reference has the same network type
-  ValidEqualToTarget : NetworkType ElementType → NetworkPredicate
-  ValidEqualToTarget type target = NonEquivalentNetwork target × typeOfNetwork target ≡ type
- 
+  record ValidEqualToTarget {Γ} (δ : NetworkType ElementType) (target : NetworkDeclaration Γ) : Set where
+    inductive
+    field
+      targetIsNotAnEquivalence : Is-nothing (NetworkDeclaration.equivalence target)
+      targetTypesMatch : NetworkTypesMatch δ (typeOfNetwork target)
+
   -- A valid isomorphic network reference has the same network shape
-  ValidIsomorphicToTarget : NetworkType ElementType → NetworkPredicate
-  ValidIsomorphicToTarget type target = let targetType = typeOfNetwork target in NonEquivalentNetwork target × shapeOfNetwork targetType ≡ shapeOfNetwork type
- 
+  record ValidIsomorphicToTarget {Γ} (δ : NetworkType ElementType) (target : NetworkDeclaration Γ) : Set where
+    inductive
+    field
+      targetIsNotAnEquivalence : Is-nothing (NetworkDeclaration.equivalence target)
+      targetShapesMatch : NetworkShapesMatch δ (typeOfNetwork target) 
+
   -----------------------
   -- Network variables --
   -----------------------
@@ -199,27 +186,27 @@ HasOutputDeclarationMatching type network = type ∈⁺ typeOfOutputs network
 -- Node variables --
 --------------------  
 
-NodeVariableSort : Set₁
-NodeVariableSort = NetworkContext → TensorType ElementType → Set
+TensorVariableType : Set₁
+TensorVariableType = NetworkContext → TensorType ElementType → Set
 
-InputVariable : NodeVariableSort
+InputVariable : TensorVariableType
 InputVariable Γ δ = AnyNetwork (HasInputDeclarationMatching δ) Γ
 
-HiddenVariable : NodeVariableSort
+HiddenVariable : TensorVariableType
 HiddenVariable Γ δ = AnyNetwork (HasHiddenDeclarationMatching δ) Γ
 
-OutputVariable : NodeVariableSort
+OutputVariable : TensorVariableType
 OutputVariable Γ δ = AnyNetwork (HasOutputDeclarationMatching δ) Γ
 
 -----------------------
 -- Element variables --
 -----------------------
 
-record ElementVariable (NodeVariable : NodeVariableSort) (Γ : NetworkContext) (τ : ElementType) : Set where
+record ElementVariable (TensorVariable : TensorVariableType) (Γ : NetworkContext) (τ : ElementType) : Set where
   constructor elementVar
   field
     shape   : TensorShape
-    node    : NodeVariable Γ (tensorType τ shape)
+    node    : TensorVariable Γ (tensorType τ shape)
     indices : TensorIndices shape
 
 InputElementVariable : NetworkContext → ElementType → Set
@@ -287,16 +274,6 @@ module _ (Γ : NetworkContext) where
   data Assertion : Set where
     assert : BoolExpr → Assertion
 
-------------------------------------------
--- Network Context non-empty constraint --
-------------------------------------------
-
-data NetworkContext⁺ : Set where
-  _∷⁺_ : (Γ : NetworkContext) → (d : NetworkDeclaration Γ) → NetworkContext⁺ 
-
-toNetworkContext : NetworkContext⁺  → NetworkContext
-toNetworkContext (Γ ∷⁺ d) = Γ ∷ d
-
 -------------
 -- Queries --
 -------------
@@ -304,8 +281,8 @@ toNetworkContext (Γ ∷⁺ d) = Γ ∷ d
 record Query : Set where
   constructor query
   field
-    context : NetworkContext⁺
-    assertions : List (Assertion (toNetworkContext context))
+    context : NetworkContext
+    assertions : List (Assertion context)
 
 open Query public
 
@@ -313,6 +290,12 @@ open Query public
 -- Environment --
 ----------------------
 
+private
+  variable
+    Γ : NetworkContext
+    d : NetworkDeclaration Γ
+    γ : NetworkType ElementType
+    
 -- Associates every declared network `d` in the context with some dependent value of type `P d`
 data AllNetworks (P : NetworkPredicate) : NetworkContext → Set where
   [] : AllNetworks P []
@@ -328,7 +311,7 @@ zipAllNetworks f [] []       = []
 zipAllNetworks f (Δ₁ ∷ Δ₁ₙ) (Δ₂ ∷ Δ₂ₙ) = zipAllNetworks f Δ₁ Δ₂ ∷ f Δ₁ₙ Δ₂ₙ
 
 lookupNetwork :
-  ∀ {Γ} {P Q : NetworkPredicate} →
+  ∀ {P Q : NetworkPredicate} →
   AllNetworks P Γ →
   AnyNetwork Q Γ →
   Σ NetworkContext (λ Γ' → Σ (NetworkDeclaration Γ') (λ d → P d × Q d))
@@ -339,17 +322,32 @@ lookupNetwork (Δ ∷ Δₙ) (there Pxs) = lookupNetwork Δ Pxs
 -- Runtime networks --
 ----------------------
 
-CorrespondingHiddenNode : ∀ {γ} → Model γ → HiddenDeclaration → Set
-CorrespondingHiddenNode network h = NodeOutput network (nodeOutputName h) (hiddenType h)
-
-record NetworkImplementation {Γ} (d : NetworkDeclaration Γ) : Set where
-  constructor networkImplementation
-  field
-    network           : Model (typeOfNetwork d)
-    hiddenNodeMapping : All (CorrespondingHiddenNode network) (hiddenDeclarations d)
-
 NetworkImplementations : NetworkContext → Set
-NetworkImplementations = AllNetworks NetworkImplementation
+NetworkImplementations = AllNetworks (λ d → Model (typeOfNetwork d))
+
+
+mutual
+  CorrespondingHiddenNode : ∀ {γ} → Model γ → HiddenDeclaration → Set
+  CorrespondingHiddenNode model h = NodeOutput model (nodeOutputName h) (hiddenType h)
+
+  record NetworkImplementation (d : NetworkDeclaration Γ) : Set where
+    constructor networkImplementation
+    field
+      model             : Model (typeOfNetwork d)
+      hiddenNodeMapping : All (CorrespondingHiddenNode model) (hiddenDeclarations d)
+      modelEquivalence  : Maybe.All (ModelsEquivalent {!!} model) (equivalence d)
+
+  ModelsEquivalent : NetworkImplementations Γ → Model γ → NetworkEquivalence Γ γ → Set
+  ModelsEquivalent models model (equal-to networkVar)      = ModelsEqual model {!!} --(proj₂ (proj₂ (lookupNetwork models networkVar)))
+  ModelsEquivalent models model (isomorphic-to networkVar) = ModelsIsomorphic model {!!} --((proj₂ (proj₂ (lookupNetwork models networkVar))))
+  
+  ModelsEqual : Model γ → (NetworkImplementation d × ValidEqualToTarget γ d) → Set
+  ModelsEqual N (target , targetValid) = N ≡[ targetTypesMatch targetValid ] model target
+    where open NetworkImplementation; open ValidEqualToTarget
+    
+  ModelsIsomorphic : Model γ → (NetworkImplementation d × ValidIsomorphicToTarget γ d) → Set
+  ModelsIsomorphic N₁ (target , targetValid) = N₁ ↭[ targetShapesMatch targetValid ] model target
+    where open NetworkImplementation; open ValidIsomorphicToTarget
 
 -----------------------
 -- Input assignments --
