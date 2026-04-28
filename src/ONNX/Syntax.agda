@@ -19,7 +19,7 @@ record TensorType (Types : Set) : Set where
     tensorType : Types
     tensorDims : TensorShape
 
-TensorShapesMatch : {Types : Set} → TensorType Types → TensorType Types → Set
+TensorShapesMatch : {Types₁ Types₂ : Set} → TensorType Types₁ → TensorType Types₂ → Set
 TensorShapesMatch δ₁ δ₂ = tensorDims δ₁ ≡ tensorDims δ₂
   where open TensorType
 
@@ -39,7 +39,7 @@ record NetworkType (Types : Set) : Set where
     inputs : InputTypes Types
     outputs : OutputTypes Types
 
-NetworkShapesMatch : {Types : Set} → NetworkType Types → NetworkType Types → Set
+NetworkShapesMatch : {Types₁ Types₂ : Set} → NetworkType Types₁ → NetworkType Types₂ → Set
 NetworkShapesMatch (networkType inputs₁ outputs₁) (networkType inputs₂ outputs₂) =
   Pointwise TensorShapesMatch inputs₁ inputs₂ ×
   Pointwise TensorShapesMatch outputs₁ outputs₂

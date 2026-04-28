@@ -9,8 +9,8 @@ module ONNX.Real
 open import Data.Product.Base
 open import Function.Base
 open import Data.List.NonEmpty as List⁺
-open import Data.List.NonEmpty.Relation.Binary.Pointwise
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Data.List.NonEmpty.Relation.Binary.Pointwise as Pointwise
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
 
 open import Data.Real
 open import Data.Tensor
@@ -20,23 +20,6 @@ open import Data.List.NonEmpty.Relation.Unary.AllUtils as All
 open NetworkTheorySyntax theorySyntax
 open TensorType using (tensorDims)
 
--------------------
--- Preliminaries --
--------------------
-
-_SameShapeAs_ : ∀ {Types₁ Types₂ : Set} → TensorType Types₁ → TensorType Types₂ → Set
-δ₁ SameShapeAs δ₂ = tensorDims δ₁ ≡ tensorDims δ₂
-
-_SameShapesAs_ : ∀ {Types₁ Types₂ : Set} → List⁺ (TensorType Types₁) → List⁺ (TensorType Types₂) → Set
-xs SameShapesAs ys = Pointwise _SameShapeAs_ xs ys
-
-record _SameNetworkShapeAs_ {Types₁ Types₂ : Set} (τ₁ : NetworkType Types₁) (τ₂ : NetworkType Types₂) : Set where
-  constructor sameNetworkShape
-  open NetworkType
-  field
-    inputsRelated  : (inputs τ₁) SameShapesAs (inputs τ₂)
-    outputsRelated : (outputs τ₁) SameShapesAs (outputs τ₂)
-  
 ------------
 -- Syntax --
 ------------
@@ -56,7 +39,7 @@ record RealModel (networkType : NetworkType RealElementType) : Set where
   field
     {runtimeNetworkType} : NetworkType ElementType
     runtimeNetwork : Model runtimeNetworkType
-    sameShape : runtimeNetworkType SameNetworkShapeAs networkType
+    sameShape : NetworkShapesMatch runtimeNetworkType networkType
 
 RealNodeOutputName : Set
 RealNodeOutputName = NodeOutputName
@@ -68,20 +51,33 @@ record RealNodeOutput {γ} (network : RealModel γ) (name : RealNodeOutputName) 
   field
     {runtimeNodeType} : TensorType ElementType
     runtimeNode : NodeOutput (RealModel.runtimeNetwork network) name runtimeNodeType
-    sameShape : runtimeNodeType SameShapeAs nodeType
+    sameShape : TensorShapesMatch runtimeNodeType nodeType
 
 realModelOutputs : ∀ {γ} (n : RealModel γ) → All⁺ (λ δ → ∃ λ u → RealNodeOutput n u δ) (NetworkType.outputs γ)
-realModelOutputs (realModel runtimeNetwork (sameNetworkShape _ outputsSameShape)) =
+realModelOutputs (realModel runtimeNetwork (_ , outputsSameShape)) =
   All.zipWith (λ {(u , z) eq → (u , realNodeOutput z eq)}) (modelOutputs runtimeNetwork) outputsSameShape
 
+_↭R[_]_ : ∀ {γ₁ γ₂} → RealModel γ₁ → NetworkShapesMatch γ₁ γ₂ → RealModel γ₂ → Set
+M ↭R[ s ] N = runtimeNetwork M ↭[ transN (sameShape M) (transN s (symN (sameShape N))) ] runtimeNetwork N
+  where
+  open RealModel
+
+  transN : ∀ {t₁ t₂ t₃} {γ₁ : NetworkType t₁} {γ₂ : NetworkType t₂} {γ₃ : NetworkType t₃} → NetworkShapesMatch γ₁ γ₂ → NetworkShapesMatch γ₂ γ₃ → NetworkShapesMatch γ₁ γ₃
+  transN (in₁ , out₁) (in₂ , out₂) = Pointwise.transitive trans in₁ in₂ , Pointwise.transitive trans out₁ out₂
+
+  symN : ∀ {t₁ t₂} {γ₁ : NetworkType t₁} {γ₂ : NetworkType t₂} → NetworkShapesMatch γ₁ γ₂ → NetworkShapesMatch γ₂ γ₁
+  symN (in₁ , out₁) = Pointwise.symmetric sym in₁ , Pointwise.symmetric sym out₁
+
+  
 realSyntax : NetworkTheorySyntax
 realSyntax = record
-  { ElementType = RealElementType
-  ; TheoryTensor = RealTheoryTensor
-  ; Model = RealModel
+  { ElementType    = RealElementType
+  ; TheoryTensor   = RealTheoryTensor
+  ; Model          = RealModel
   ; NodeOutputName = RealNodeOutputName
-  ; NodeOutput = RealNodeOutput
-  ; modelOutputs = realModelOutputs
+  ; NodeOutput     = RealNodeOutput
+  ; modelOutputs   = realModelOutputs
+  ; _↭[_]_        = _↭R[_]_
   }
 
 ---------------
@@ -100,11 +96,11 @@ RealNetworkSemantics : Set
 RealNetworkSemantics =
   ∀ {γ₁ γ₂} →
   (n : Model γ₁) →
-  γ₁ SameNetworkShapeAs γ₂ →
+  NetworkShapesMatch γ₁ γ₂ →
   InputSemantics ⟦realElementType⟧ γ₂ →
   ∀ {δ₁ δ₂ u} →
   NodeOutput n u δ₁ →
-  δ₁ SameShapeAs δ₂ →
+  TensorShapesMatch δ₁ δ₂ →
   TensorSemantics ⟦realElementType⟧ δ₂
 
 ⟦realTheoryTensor⟧ : ∀ {τ} → RealTheoryTensor τ → TensorSemantics ⟦realElementType⟧ τ

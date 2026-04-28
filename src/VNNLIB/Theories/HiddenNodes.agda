@@ -7,6 +7,7 @@ module VNNLIB.Theories.HiddenNodes
 open import Data.List using (length)
 open import Relation.Unary
 open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Data.List.Relation.Unary.All using (All)
 
 open import VNNLIB.Syntax networkSyntax
 open import VNNLIB.Theories.Definition networkSyntax
@@ -28,7 +29,7 @@ NoHiddenNodes network = length (hiddenDeclarations network) ≡ 0
 
 -- A query lives in the NH theory 
 NoHiddenNodesTheory : Theory
-NoHiddenNodesTheory (query networks _) = AllNetworks NoHiddenNodes (toNetworkContext networks)
+NoHiddenNodesTheory (query networks _ _) = All NoHiddenNodes networks
 
 
 -------

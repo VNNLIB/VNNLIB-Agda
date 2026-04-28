@@ -12,6 +12,7 @@ open import VNNLIB.Syntax
 open import VNNLIB.Semantics
 open import VNNLIB.Parser
 open import VNNLIB.Theories
+open import VNNLIB.Example
 
 ------------
 -- VNNLIB --

@@ -9,6 +9,7 @@ module VNNLIB.Semantics
 open import Algebra.Core using (Op₂)
 open import Data.Bool.ListAction as ListAction using (and)
 open import Data.List.Base as List hiding (and)
+open import Data.List.Relation.Unary.Any as Any using (Any; here; there)
 open import Data.List.Relation.Unary.All as All using (All; []; _∷_)
 open import Data.List.Relation.Unary.All.Properties as All using ()
 open import Data.List.Membership.Propositional as ∈
@@ -36,25 +37,25 @@ open NetworkTheorySemantics onnxSemantics
 
 private
   variable
-    Γ : NetworkContext
+    Γ : NetworkDeclarations
     τ : ElementType
-    d : NetworkDeclaration Γ
+    d : NetworkDeclaration
     shape : TensorShape
 
 -----------------
 -- Environment --
 -----------------
 
-InputsValues : NetworkDeclaration Γ → Set
+InputsValues : NetworkDeclaration → Set
 InputsValues d = All⁺ (TensorSemantics ⟦elementType⟧) (typeOfInputs d)
 
-HiddenValues : NetworkDeclaration Γ → Set
+HiddenValues : NetworkDeclaration → Set
 HiddenValues d = All (TensorSemantics ⟦elementType⟧) (typeOfHiddenNodes d)
 
-OutputsValues : NetworkDeclaration Γ → Set
+OutputsValues : NetworkDeclaration → Set
 OutputsValues d = All⁺ (TensorSemantics ⟦elementType⟧) (typeOfOutputs d)
 
-record NetworkVariableValues (d : NetworkDeclaration Γ) : Set where
+record NetworkVariableValues (d : NetworkDeclaration) : Set where
   constructor variableValues
   field
     ⟦inputs⟧  : InputsValues d
@@ -71,11 +72,19 @@ createNetworkVariableValues (networkImplementation network hiddenNodeMapping) in
   let ⟦outputs⟧ = All⁺.map (λ (u , z) → ⟦model⟧ network ⟦inputs⟧ z) (modelOutputs network)
   variableValues ⟦inputs⟧ ⟦hidden⟧ ⟦outputs⟧
 
-Environment : NetworkContext → Set
-Environment = AllNetworks NetworkVariableValues
+Environment : NetworkDeclarations → Set
+Environment = All NetworkVariableValues
 
 createEnvironment : NetworkImplementations Γ → InputAssignments Γ → Environment Γ
-createEnvironment = zipAllNetworks createNetworkVariableValues
+createEnvironment xs ys = All.zipWith (uncurry createNetworkVariableValues) (xs , ys)
+
+lookupNetwork :
+  ∀ {Γ} {P Q : NetworkPredicate} →
+  All P Γ →
+  Any Q Γ →
+  Σ (NetworkDeclaration) (λ d → P d × Q d)
+lookupNetwork (Δₙ ∷ Δ) (here Px)    = _ , Δₙ , Px
+lookupNetwork (Δₙ ∷ Δ) (there Pxs) = lookupNetwork Δ Pxs
 
 --------------------------
 -- Assertion components --
@@ -91,20 +100,20 @@ module _ (Δ : Environment Γ) where
   ⟦constant⟧ τ = TensorSemantics ⟦elementType⟧ (tensorType τ [])
   
   ⟦inputVar⟧ : InputElementVariable Γ τ → ⟦constant⟧ τ
-  ⟦inputVar⟧ (elementVar _ inputNode indices) = do
-    let (_ , _ , variableValues ⟦inputs⟧ _ _ , inputRef) = lookupNetwork Δ inputNode
+  ⟦inputVar⟧ (elementVar inputNode indices) = do
+    let (_ , variableValues ⟦inputs⟧ _ _ , inputRef) = lookupNetwork Δ inputNode
     let ⟦input⟧ = ∈⁺.lookup ⟦inputs⟧ inputRef
     tensorLookup ⟦input⟧ indices
 
   ⟦hiddenVar⟧ : HiddenElementVariable Γ τ → ⟦constant⟧ τ
-  ⟦hiddenVar⟧ (elementVar _ hiddenNode indices) = do
-    let (_ , _ , variableValues _ ⟦hidden⟧ _ , hiddenRef) = lookupNetwork Δ hiddenNode
+  ⟦hiddenVar⟧ (elementVar hiddenNode indices) = do
+    let (_ , variableValues _ ⟦hidden⟧ _ , hiddenRef) = lookupNetwork Δ hiddenNode
     let hiddenTensor = All.lookup ⟦hidden⟧ hiddenRef
     tensorLookup hiddenTensor indices
     
   ⟦outputVar⟧ : OutputElementVariable Γ τ → ⟦constant⟧ τ
-  ⟦outputVar⟧ (elementVar _ outputNode indices) = do
-    let (_ , _ , variableValues _ _ ⟦outputs⟧ , outputRef) = lookupNetwork Δ outputNode
+  ⟦outputVar⟧ (elementVar outputNode indices) = do
+    let (_ , variableValues _ _ ⟦outputs⟧ , outputRef) = lookupNetwork Δ outputNode
     let outputTensor = ∈⁺.lookup ⟦outputs⟧ outputRef
     tensorLookup outputTensor indices
 
@@ -131,7 +140,7 @@ module _ (Δ : Environment Γ) where
   ⟦compExpr⟧ (greaterThan  e₁ e₂) = ⟦>⟧ (⟦arithExpr⟧ e₁) (⟦arithExpr⟧ e₂)
   ⟦compExpr⟧ (lessThan     e₁ e₂) = ⟦<⟧ (⟦arithExpr⟧ e₁) (⟦arithExpr⟧ e₂)
   ⟦compExpr⟧ (greaterEqual e₁ e₂) = ⟦≥⟧ (⟦arithExpr⟧ e₁) (⟦arithExpr⟧ e₂)
-  ⟦compExpr⟧ (lessEqual    e₁ e₂) = ⟦<⟧ (⟦arithExpr⟧ e₁) (⟦arithExpr⟧ e₂)
+  ⟦compExpr⟧ (lessEqual    e₁ e₂) = ⟦≤⟧ (⟦arithExpr⟧ e₁) (⟦arithExpr⟧ e₂)
   ⟦compExpr⟧ (notEqual     e₁ e₂) = ⟦≠⟧ (⟦arithExpr⟧ e₁) (⟦arithExpr⟧ e₂)
   ⟦compExpr⟧ (equal        e₁ e₂) = ⟦=⟧ (⟦arithExpr⟧ e₁) (⟦arithExpr⟧ e₂)
 
@@ -141,10 +150,10 @@ module _ (Δ : Environment Γ) where
 
   mutual  
     ⟦boolExpr⟧ : BoolExpr Γ → Bool
-    ⟦boolExpr⟧ (literal  b)        = b
-    ⟦boolExpr⟧ (and (b ∷ bs))  = ⟦boolExprList⟧ _∧_ (⟦boolExpr⟧ b) bs
-    ⟦boolExpr⟧ (or  (b ∷ bs))  = ⟦boolExprList⟧ _∨_ (⟦boolExpr⟧ b) bs
-    ⟦boolExpr⟧ (comparison (τ , e))  = ⟦compExpr⟧ e
+    ⟦boolExpr⟧ (literal  b)    = b
+    ⟦boolExpr⟧ (and (b ∷ bs)) = ⟦boolExprList⟧ _∧_ (⟦boolExpr⟧ b) bs
+    ⟦boolExpr⟧ (or  (b ∷ bs)) = ⟦boolExprList⟧ _∨_ (⟦boolExpr⟧ b) bs
+    ⟦boolExpr⟧ (comparison e)  = ⟦compExpr⟧ e
 
     ⟦boolExprList⟧ : Op₂ Bool → Bool → List (BoolExpr Γ) → Bool
     ⟦boolExprList⟧ op e []       = e
@@ -162,13 +171,13 @@ module _ (Δ : Environment Γ) where
 
 -------------
 -- Queries --
--------------
+------------- 
 
 QuerySemantics : Set₁
-QuerySemantics = (q : Query) → NetworkImplementations (toNetworkContext (context q)) → Set
+QuerySemantics = (q : Query) → QueryModels q → Set
 
 ⟦query⟧ : QuerySemantics
-⟦query⟧ (query Γ assertions) networks =
-  ∃ λ (assignment : InputAssignments (toNetworkContext Γ)) →
-    let Δ = createEnvironment networks assignment in
+⟦query⟧ (query networks assertions _) (queryModels models _) =
+  ∃ λ (assignment : InputAssignments networks) →
+    let Δ = createEnvironment models assignment in
     True (⟦assertionList⟧ Δ assertions)
