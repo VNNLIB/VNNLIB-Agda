@@ -122,8 +122,8 @@ PolynomialArithmeticTheory = U
 --------------------
 
 instance
-   MultipleNetworksInterpretation : Interpretation ArithmeticComplexity
-   MultipleNetworksInterpretation = record
+   ArithmeticComplexityInterpretation : Interpretation ArithmeticComplexity
+   ArithmeticComplexityInterpretation = record
      { interpretation = λ
        { BND  → BoundedVariablesTheory
        ; OUTC → OutputComparisonsTheory

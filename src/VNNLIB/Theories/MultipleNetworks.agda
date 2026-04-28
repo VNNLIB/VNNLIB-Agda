@@ -4,13 +4,14 @@ module VNNLIB.Theories.MultipleNetworks
   (networkSyntax : NetworkTheorySyntax)
   where
 
-open import Data.Nat using (ℕ)
+open import Data.Nat.Base using (ℕ)
 open import Data.Unit.Base using (⊤)
 open import Data.Empty using (⊥)
-open import Data.List using (length)
+open import Data.List.Base using ([]; _∷_; length)
+open import Data.List.Relation.Unary.All using (All)
 open import Data.Product.Base using (_×_)
 open import Data.Sum using (_⊎_)
-open import Relation.Unary using (Pred)
+open import Relation.Unary using (Pred; U)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Level
 open import Data.Maybe using (just; nothing)
@@ -18,7 +19,6 @@ open import Data.Maybe using (just; nothing)
 
 open import VNNLIB.Syntax networkSyntax
 open import VNNLIB.Theories.Definition networkSyntax
-
 
 ----------------
 -- Theory set --
@@ -35,42 +35,52 @@ data MultipleNetworks : Set where
 ----------  
 
 SingleNetwork : NetworksPredicate
-SingleNetwork networks = networkContextLength (toNetworkContext networks) ≡ 1
+SingleNetwork networks = networkContextLength networks ≡ 1
   where
-    networkContextLength : NetworkContext → ℕ
+    networkContextLength : NetworkDeclarations → ℕ
     networkContextLength [] = ℕ.zero
-    networkContextLength (Γ ∷ x) = ℕ.suc (networkContextLength Γ)
+    networkContextLength (x ∷ Γ) = ℕ.suc (networkContextLength Γ)
     
 -- A query that lives in the SNET theory
 SingleNetworkTheory : Theory
-SingleNetworkTheory (query networks _) = SingleNetwork networks
+SingleNetworkTheory (query networks _ _) = SingleNetwork networks
 
 -----------
 -- MENET --
 -----------
 
+IsEqualNetwork : NetworkDeclaration → Set
+IsEqualNetwork (declareNetwork _ _ _ _ (equal-to _)) = ⊤
+IsEqualNetwork _ = ⊥
+
 -- A query where all networks are equal
 MultipleEqualNetworks : NetworksPredicate
-MultipleEqualNetworks (networks ∷⁺ x) = NonEquivalentNetwork x × AllNetworks EqualNetwork networks
+MultipleEqualNetworks []        = ⊤
+MultipleEqualNetworks (d ∷ ds) = All IsEqualNetwork ds
 
 -- A query that lives in the MENET theory
 MultipleEqualNetworksTheory : Theory
-MultipleEqualNetworksTheory (query networks _) = MultipleEqualNetworks networks
+MultipleEqualNetworksTheory (query networks _ _) = MultipleEqualNetworks networks
 
 -----------
 -- MINET --
 -----------
 
+IsIsomorphicNetwork : NetworkDeclaration → Set
+IsIsomorphicNetwork (declareNetwork _ _ _ _ (isomorphic-to _)) = ⊤
+IsIsomorphicNetwork _ = ⊥
+
 -- A network that is equal to another network is also in the isomorphic theory
 MultipleIsomorphicNetworks : NetworksPredicate
-MultipleIsomorphicNetworks (networks ∷⁺ x) = NonEquivalentNetwork x × AllNetworks TheoryIsomorphicNetwork networks
+MultipleIsomorphicNetworks []        = ⊤
+MultipleIsomorphicNetworks (d ∷ ds) = All TheoryIsomorphicNetwork ds
   where
     TheoryIsomorphicNetwork : NetworkPredicate
-    TheoryIsomorphicNetwork network = IsomorphicNetwork network ⊎ EqualNetwork network
+    TheoryIsomorphicNetwork network = IsIsomorphicNetwork network ⊎ IsEqualNetwork network
 
 -- A query that lives in the MINET theory
 MultipleIsomorphicNetworksTheory : Theory
-MultipleIsomorphicNetworksTheory (query networks _) = MultipleIsomorphicNetworks networks
+MultipleIsomorphicNetworksTheory (query networks _ _) = MultipleIsomorphicNetworks networks
 
 
 ----------

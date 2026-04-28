@@ -7,8 +7,10 @@ module VNNLIB.Parser
   where
 
 open import Data.List as List using (List; []; _∷_)
-open import Data.List.Properties using (length-map)
+open import Data.List.Properties using (length-map; ≡-dec)
 open import Data.List.NonEmpty as List⁺ hiding (_∷⁺_)
+import Data.List.NonEmpty.Properties as List⁺
+open import Data.List.NonEmpty.Relation.Binary.Pointwise as NonEmpty
 open import Data.Bool as Bool
 open import Data.String as String using (String; _==_)
 open import Relation.Binary.PropositionalEquality
@@ -25,7 +27,7 @@ open import Data.Sum.Base as Sum using (inj₁; inj₂)
 open import Data.Unit
 open import Level
 open import Effect.Monad
-open import Function.Base using (_$_; case_of_; flip)
+open import Function.Base using (_$_; _∘_; case_of_; flip)
 import Relation.Nullary.Decidable as Dec
 open import Data.List.Relation.Unary.Unique.DecPropositional using (unique?)
 
@@ -61,7 +63,7 @@ numberRep (B.number (B.#pair pos name)) = name
 -- Context --
 -------------
 
-TensorVarResult : NetworkContext → Set
+TensorVarResult : NetworkDeclarations → Set
 TensorVarResult Γ = Σ (TensorType ElementType) (λ τ → InputVariable Γ τ ⊎ HiddenVariable Γ τ ⊎ OutputVariable Γ τ)
 
 module _
@@ -90,86 +92,129 @@ module _
       else Maybe.map (Product.map₂ Any⁺.there) (lookupNameInNodes xs name)
   
 lookupNameInInputs :
-  ∀ {Γ} (n : NetworkDeclaration Γ) →
+  ∀ (n : NetworkDeclaration) →
   B.VariableName →
   Maybe (Σ (TensorType ElementType) (λ δ → HasInputDeclarationMatching δ n))
-lookupNameInInputs {Γ} n name = lookupNameInNonEmptyNodes inputType inputName (inputDeclarations n) name
+lookupNameInInputs n name = lookupNameInNonEmptyNodes inputType inputName (inputDeclarations n) name
   
 lookupNameInHidden :
-  ∀ {Γ} (n : NetworkDeclaration Γ) →
+  ∀ (n : NetworkDeclaration) →
   B.VariableName →
   Maybe (Σ (TensorType ElementType) (λ δ → HasHiddenDeclarationMatching δ n))
-lookupNameInHidden {Γ} n name = lookupNameInNodes hiddenType hiddenName (hiddenDeclarations n) name
+lookupNameInHidden n name = lookupNameInNodes hiddenType hiddenName (hiddenDeclarations n) name
   
 lookupNameInOutputs :
-  ∀ {Γ} (n : NetworkDeclaration Γ) →
+  ∀ (n : NetworkDeclaration) →
   B.VariableName →
   Maybe (Σ (TensorType ElementType) (λ δ → HasOutputDeclarationMatching δ n))
-lookupNameInOutputs {Γ} n name = lookupNameInNonEmptyNodes outputType outputName (outputDeclarations n) name
+lookupNameInOutputs n name = lookupNameInNonEmptyNodes outputType outputName (outputDeclarations n) name
 
-lookupTensorVariableInNetwork : ∀ {Γ} (n : NetworkDeclaration Γ) → B.VariableName → Maybe (TensorVarResult (Γ ∷ n))
+lookupTensorVariableInNetwork : ∀ {Γ} (n : NetworkDeclaration) → B.VariableName → Maybe (TensorVarResult (n ∷ Γ))
 lookupTensorVariableInNetwork n name with lookupNameInInputs n name | lookupNameInHidden n name | lookupNameInOutputs n name
 ... | just (τ , i) | _            | _            = just (τ , inj₁ (here i))
 ... | _            | just (τ , h) | _            = just (τ , inj₂ (inj₁ (here h)))
 ... | _            | _            | just (τ , o) = just (τ , inj₂ (inj₂ (here o)))
 ... | nothing      | nothing      | nothing      = nothing
 
-lookupTensorVariable : (Γ : NetworkContext) → B.VariableName → TCM (TensorVarResult Γ)
+lookupTensorVariable : (Γ : NetworkDeclarations) → B.VariableName → TCM (TensorVarResult Γ)
 lookupTensorVariable []       name = throw "Missing tensor variable"
-lookupTensorVariable (Γ ∷ n) name = do
+lookupTensorVariable (n ∷ Γ) name = do
   case lookupTensorVariableInNetwork n name of λ where
     (just result) → return result
     nothing → Product.map₂ (Sum.map there (Sum.map there there)) <$> lookupTensorVariable Γ name
 
-variablesDeclared : ∀ {Γ} → NetworkDeclaration Γ → List Name
+variablesDeclared : NetworkDeclaration → List Name
 variablesDeclared n = do
   let inputNames = List.map inputName (List⁺.toList $ inputDeclarations n)
   let hiddenNames = List.map hiddenName (hiddenDeclarations n)
   let outputNames = List.map outputName (List⁺.toList $ outputDeclarations n)
   networkName n ∷ List.concat (inputNames ∷ outputNames ∷ [])
 
-allVariablesDeclared : NetworkContext → List Name
+allVariablesDeclared : NetworkDeclarations → List Name
 allVariablesDeclared [] = []
-allVariablesDeclared (Γ ∷ x) = variablesDeclared x List.++ allVariablesDeclared Γ
+allVariablesDeclared (x ∷ Γ) = variablesDeclared x List.++ allVariablesDeclared Γ
 
--- TODO: Add proofs
-postulate isNetworkTypeEqual : (type₁ : NetworkType ElementType) → (type₂ : NetworkType ElementType) → Maybe (type₁ ≡ type₂)
-postulate isNetworkShapeEqual : (shape₁ : NetworkShape) → (shape₂ : NetworkShape) → Maybe (shape₁ ≡ shape₂)
+isTensorTypeEqual : DecidableEquality (TensorType ElementType)
+isTensorTypeEqual (tensorType tensorType₁ tensorDims₁) (tensorType tensorType₂ tensorDims₂)
+  with tensorType₁ Theory.≟ tensorType₂ | tensorDims₁ shape-≟ tensorDims₂
+... | yes p | yes t = yes (cong₂ tensorType p t)
+... | no ¬p | _     = no λ {refl → ¬p refl} 
+... | _     | no ¬t = no λ {refl → ¬t refl}
 
-checkTargetNetworkEquivStatements : ∀ {Γ} → (d : NetworkDeclaration Γ) → Maybe (NonEquivalentNetwork d)
+isTensorShapeEqual : Decidable (TensorShapesMatch {ElementType} {ElementType})
+isTensorShapeEqual xs ys = TensorType.tensorDims xs shape-≟ TensorType.tensorDims ys
+
+isNetworkTypeEqual : DecidableEquality (NetworkType ElementType)
+isNetworkTypeEqual (networkType inputs₁ outputs₁) (networkType inputs₂ outputs₂)
+  with NonEmpty.decidableEq isTensorTypeEqual inputs₁ inputs₂
+     | NonEmpty.decidableEq isTensorTypeEqual outputs₁ outputs₂
+... | yes eq₁ | yes eq₂ = yes (cong₂ networkType eq₁ eq₂)
+... | no ¬eq₁ | _       = no λ {refl → ¬eq₁ refl}
+... | _       | no ¬eq₂ = no λ {refl → ¬eq₂ refl}
+  
+isNetworkShapeEqual : (γ₁ : NetworkType ElementType) (γ₂ : NetworkType ElementType) → Maybe (NetworkShapesMatch γ₁ γ₂)
+isNetworkShapeEqual (networkType inputs₁ outputs₁) (networkType inputs₂ outputs₂)
+  with NonEmpty.decidable isTensorShapeEqual inputs₁ inputs₂
+     | NonEmpty.decidable isTensorShapeEqual outputs₁ outputs₂
+... | yes eq₁ | yes eq₂ = just (eq₁ , eq₂)
+... | no ¬eq₁ | _       = nothing
+... | _       | no ¬eq₂ = nothing
+
+checkTargetNetworkEquivStatements : (d : NetworkDeclaration) → Maybe (equivalence d ≡ none)
 checkTargetNetworkEquivStatements (declareNetwork _ _ _ _ equiv) with equiv
-... | just x = nothing
-... | nothing = just isNonEquivalentNetwork
+... | none = just refl
+... | _    = nothing
 
 lookupEqualNetwork :
-  (Γ : NetworkContext) →
-  (name : B.VariableName) →
-  (type : NetworkType ElementType) →
-  Maybe (EqualNetworkVariable Γ type)
+  (Γ : NetworkDeclarations) →
+  (name : Name) →
+  (d : NetworkDeclaration) →
+  Maybe (Any (ValidEqualToTarget name d) Γ)
 lookupEqualNetwork [] _ _ = nothing
-lookupEqualNetwork (Γ ∷ d) name type with networkName d String.≟ getVariableName name | checkTargetNetworkEquivStatements d | isNetworkTypeEqual (typeOfNetwork d) type
-... | no _  | _       | _       = Maybe.map there (lookupEqualNetwork Γ name type)
-... | yes _ | just e₁ | just e₂ = just (here (e₁ , e₂))
-... | yes _ | _       | _       = nothing
+lookupEqualNetwork (d₂ ∷ Γ) name d₁
+  with name String.≟ networkName d₂
+     | checkTargetNetworkEquivStatements d₂
+     | isNetworkTypeEqual (typeOfNetwork d₁) (typeOfNetwork d₂)
+... | no _       | _       | _       = Maybe.map there (lookupEqualNetwork Γ name d₁)
+... | yes nameEq | just e₁ | yes e₂ = just (here (validEqualTo e₁ e₂ nameEq))
+... | yes _      | _       | _       = nothing
 
 lookupIsomorphicNetwork :
-  (Γ : NetworkContext) →
-  (name : B.VariableName) →
-  (type : NetworkType ElementType) →
-  Maybe (IsomorphicNetworkVariable Γ type)
+  (Γ : NetworkDeclarations) →
+  (name : Name) →
+  (d : NetworkDeclaration) →
+  Maybe (Any (ValidIsomorphicToTarget name d) Γ)
 lookupIsomorphicNetwork [] _ _ = nothing
-lookupIsomorphicNetwork (Γ ∷ d) name type
-  with networkName d String.≟ getVariableName name | checkTargetNetworkEquivStatements d | isNetworkShapeEqual (shapeOfNetwork (typeOfNetwork d)) (shapeOfNetwork type)
-... | no _  | _       | _       = Maybe.map there (lookupIsomorphicNetwork Γ name type)
-... | yes _ | just e₁ | just e₂ = just (here (e₁ , e₂))
-... | yes _ | _       | _       = nothing
+lookupIsomorphicNetwork (d₂ ∷ Γ) name d₁
+  with name String.≟ networkName d₂
+     | checkTargetNetworkEquivStatements d₂
+     | isNetworkShapeEqual (typeOfNetwork d₁) (typeOfNetwork d₂)
+... | no _       | _       | _       = Maybe.map there (lookupIsomorphicNetwork Γ name d₁)
+... | yes nameEq | just e₁ | just e₂ = just (here (validIsomorphicTo e₁ e₂ nameEq))
+... | yes _      | _       | _       = nothing
+
+checkValidEquivalence : (Γ : NetworkDeclarations) (d : NetworkDeclaration) (e : NetworkEquivalence) → TCM (ValidNetworkEquivalence Γ d e)
+checkValidEquivalence Γ d none = return none
+checkValidEquivalence Γ d (equal-to x) with lookupEqualNetwork Γ x d
+... | just e = return (equal-to e)
+... | nothing = throw "Could not parse equal Equivalence statement"
+checkValidEquivalence Γ d (isomorphic-to x) with lookupIsomorphicNetwork Γ x d
+... | just e = return (isomorphic-to e)
+... | nothing = throw "Could not parse isomorphic Equivalence statement"
+
+checkValidEquivalences : (Γ : NetworkDeclarations) → TCM (ValidNetworkEquivalences Γ)
+checkValidEquivalences [] = return []
+checkValidEquivalences (d ∷ Γ) = do
+  e ← checkValidEquivalence Γ d (equivalence d)
+  es ← checkValidEquivalences Γ
+  return (e ∷ es)
 
 -----------------
 -- Declarations --
 -----------------
 
 -- TODO we should make this more efficient, caching a set rather than recomputing all names
-checkNameUnique : (Γ : NetworkContext) → B.VariableName → TCM Name
+checkNameUnique : (Γ : NetworkDeclarations) → B.VariableName → TCM Name
 checkNameUnique Γ name = do
   let name' = getVariableName name
   let names = allVariablesDeclared Γ
@@ -178,7 +223,7 @@ checkNameUnique Γ name = do
     (no _) → return name'
 
 -- TODO we should make this more efficient, caching a set rather than recomputing all names
-checkNamesLocallyUnique : ∀ {Γ} → NetworkDeclaration Γ → TCM ⊤
+checkNamesLocallyUnique :  NetworkDeclaration → TCM ⊤
 checkNamesLocallyUnique n = do
   let names = variablesDeclared n
   case unique? String._≟_ names of λ where
@@ -206,36 +251,31 @@ checkElementType : B.ElementType → TCM ElementType
 checkElementType (B.dType τ) with Theory.readElementType (getVariableName τ)
 ... | just r  = return r
 ... | nothing = throw "Could not parse type"
-    
-checkEquivalenceStatement : (Γ : NetworkContext) → B.NetworkEquivalence → (type : NetworkType ElementType) → TCM (Maybe (NetworkEquivalence Γ type))
-checkEquivalenceStatement Γ (B.isomorphicTo x) type with lookupIsomorphicNetwork Γ x type
-... | just e = return (just (isomorphic-to e))
-... | nothing = throw "Could not parse isomorphic Equivalence statement"
-checkEquivalenceStatement Γ (B.equalTo x) type with lookupEqualNetwork Γ x type
-... | just e = return (just (equal-to e))
-... | nothing = throw "Could not parse equal Equivalence statement"
 
--- TODO:  List B.NetworkEquivalence should not be allowable in the grammar so it should be a single equivalence statement statement check
-checkEquivalenceStatements : (Γ : NetworkContext) → List B.NetworkEquivalence → (type : NetworkType ElementType) → TCM (Maybe (NetworkEquivalence Γ type))
-checkEquivalenceStatements Γ [] _ = return nothing
-checkEquivalenceStatements Γ (x ∷ []) type = checkEquivalenceStatement Γ x type
-checkEquivalenceStatements Γ (x ∷ x₁ ∷ equivs) _ = throw "Must at most have one equivalence statement"
+checkEquivalenceStatement : B.NetworkEquivalence → TCM NetworkEquivalence
+checkEquivalenceStatement (B.isomorphicTo x) = return (isomorphic-to (getVariableName x))
+checkEquivalenceStatement (B.equalTo x)      = return (equal-to (getVariableName x))
 
-checkInputDeclaration : NetworkContext → B.InputDefinition → TCM (InputDeclaration)
+checkEquivalenceStatements : List B.NetworkEquivalence → TCM NetworkEquivalence
+checkEquivalenceStatements [] = return none
+checkEquivalenceStatements (x ∷ []) = checkEquivalenceStatement x
+checkEquivalenceStatements (x ∷ x₁ ∷ equivs) = throw "Must at most have one equivalence statement"
+
+checkInputDeclaration : NetworkDeclarations → B.InputDefinition → TCM (InputDeclaration)
 checkInputDeclaration Γ (B.inputDef varName τ shape) = do
   name' ← checkNameUnique Γ varName
   shape' ← checkTensorShape shape
   τ' ← checkElementType τ
   return (declareInput name' (tensorType τ' shape'))
 
-checkInputDeclarations : NetworkContext → List B.InputDefinition → TCM (List⁺ InputDeclaration)
+checkInputDeclarations : NetworkDeclarations → List B.InputDefinition → TCM (List⁺ InputDeclaration)
 checkInputDeclarations Γ [] = throw "Must be at least one input definition"
 checkInputDeclarations Γ (x ∷ xs) = do
   x' ← checkInputDeclaration Γ x
   xs' ← traverseTCMList (checkInputDeclaration Γ) xs
   return (x' ∷ xs')
 
-checkHiddenDeclaration : NetworkContext → B.HiddenDefinition → TCM (HiddenDeclaration)
+checkHiddenDeclaration : NetworkDeclarations → B.HiddenDefinition → TCM (HiddenDeclaration)
 checkHiddenDeclaration Γ (B.hiddenDef varName τ shape node) = do
   name' ← checkNameUnique Γ varName
   shape' ← checkTensorShape shape
@@ -243,41 +283,40 @@ checkHiddenDeclaration Γ (B.hiddenDef varName τ shape node) = do
   nodeName' ← checkNodeName node
   return (declareHidden name' (tensorType τ' shape') nodeName')
 
-checkHiddenDeclarations : NetworkContext → List B.HiddenDefinition → TCM (List HiddenDeclaration)
+checkHiddenDeclarations : NetworkDeclarations → List B.HiddenDefinition → TCM (List HiddenDeclaration)
 checkHiddenDeclarations Γ = traverseTCMList (checkHiddenDeclaration Γ)
 
-checkOutputDeclaration : NetworkContext → B.OutputDefinition → TCM OutputDeclaration
+checkOutputDeclaration : NetworkDeclarations → B.OutputDefinition → TCM OutputDeclaration
 checkOutputDeclaration Γ (B.outputDef varName e t) = do
   name ← checkNameUnique Γ varName
   t' ← checkTensorShape t
   e' ← checkElementType e
   return (declareOutput name (tensorType e' t'))
 
-checkOutputDeclarations : NetworkContext → List B.OutputDefinition → TCM (List⁺ OutputDeclaration)
+checkOutputDeclarations : NetworkDeclarations → List B.OutputDefinition → TCM (List⁺ OutputDeclaration)
 checkOutputDeclarations Γ [] = throw "Must be at least one output definition"
 checkOutputDeclarations Γ (x ∷ xs) = do
   x' ← checkOutputDeclaration Γ x
   xs' ← traverseTCMList (checkOutputDeclaration Γ) xs
   return (x' ∷ xs')
 
-checkNetworkDeclaration : ∀ Γ → B.NetworkDefinition → TCM (NetworkDeclaration Γ)
+checkNetworkDeclaration : ∀ Γ → B.NetworkDefinition → TCM (NetworkDeclaration)
 checkNetworkDeclaration Γ (B.networkDef varName equivs inputs hidden outputs) = do
   name ← checkNameUnique Γ varName
   inputs ← checkInputDeclarations Γ inputs
   hidden ← checkHiddenDeclarations Γ hidden
   outputs ← checkOutputDeclarations Γ outputs
-  equivalence ← checkEquivalenceStatements Γ equivs (typeOfNetworkRecord inputs outputs)
+  equivalence ← checkEquivalenceStatements equivs
   let decl = declareNetwork name inputs hidden outputs equivalence
   checkNamesLocallyUnique decl
   return decl
 
-checkNetworks : List B.NetworkDefinition → TCM NetworkContext⁺
+checkNetworks : List B.NetworkDefinition → TCM NetworkDeclarations
 checkNetworks [] = throw "Must be at least one Network Declaration"
 checkNetworks (n ∷ ns) = do
   ns' ← checkNetworks ns
-  let ns'' = toNetworkContext ns'
-  n' ← checkNetworkDeclaration ns'' n
-  return (ns'' ∷⁺ n')
+  n' ← checkNetworkDeclaration ns' n
+  return (n' ∷ ns')
 
 ----------------
 -- Assertions --
@@ -293,7 +332,7 @@ checkIndices (i ∷ is) (d ∷ ds) = do
   rest ← checkIndices is ds
   return (idx ∷ rest)
 
-module _ (Γ : NetworkContext) where
+module _ (Γ : NetworkDeclarations) where
 
   checkNumber : B.Number → (τ : ElementType) → TCM (ArithExpr Γ τ)
   checkNumber num τ with Theory.readNumber τ (numberRep num)
@@ -305,9 +344,9 @@ module _ (Γ : NetworkContext) where
     (tensorType τ shape , var) ← lookupTensorVariable Γ varName
     indices' ← checkIndices indices shape
     let expr = case var of λ where
-      (inj₁ input) → inputVar (elementVar shape input indices')
-      (inj₂ (inj₁ hidden)) → hiddenVar (elementVar shape hidden indices')
-      (inj₂ (inj₂ output)) → outputVar (elementVar shape output indices')
+      (inj₁ input) → inputVar (elementVar input indices')
+      (inj₂ (inj₁ hidden)) → hiddenVar (elementVar hidden indices')
+      (inj₂ (inj₂ output)) → outputVar (elementVar output indices')
     return (τ , expr)
     
   mutual
@@ -341,12 +380,12 @@ module _ (Γ : NetworkContext) where
 
   mutual
     checkBoolExpr : B.BoolExpr → TCM (BoolExpr Γ)
-    checkBoolExpr (B.greaterThan  e₁ e₂) = comparison <$> checkComparison greaterThan  e₁ e₂
-    checkBoolExpr (B.lessThan     e₁ e₂) = comparison <$> checkComparison lessThan     e₁ e₂
-    checkBoolExpr (B.greaterEqual e₁ e₂) = comparison <$> checkComparison greaterEqual e₁ e₂
-    checkBoolExpr (B.lessEqual    e₁ e₂) = comparison <$> checkComparison lessEqual    e₁ e₂
-    checkBoolExpr (B.notEqual     e₁ e₂) = comparison <$> checkComparison notEqual     e₁ e₂
-    checkBoolExpr (B.equal        e₁ e₂) = comparison <$> checkComparison equal        e₁ e₂
+    checkBoolExpr (B.greaterThan  e₁ e₂) = comparison ∘ proj₂ <$> checkComparison greaterThan  e₁ e₂
+    checkBoolExpr (B.lessThan     e₁ e₂) = comparison ∘ proj₂ <$> checkComparison lessThan     e₁ e₂
+    checkBoolExpr (B.greaterEqual e₁ e₂) = comparison ∘ proj₂ <$> checkComparison greaterEqual e₁ e₂
+    checkBoolExpr (B.lessEqual    e₁ e₂) = comparison ∘ proj₂ <$> checkComparison lessEqual    e₁ e₂
+    checkBoolExpr (B.notEqual     e₁ e₂) = comparison ∘ proj₂ <$> checkComparison notEqual     e₁ e₂
+    checkBoolExpr (B.equal        e₁ e₂) = comparison ∘ proj₂ <$> checkComparison equal        e₁ e₂
     checkBoolExpr (B.and es)    = and  <$> checkList⁺BoolExpr es
     checkBoolExpr (B.or  es)    = or   <$> checkList⁺BoolExpr  es
     
@@ -377,8 +416,9 @@ module _ (Γ : NetworkContext) where
 checkQuery : B.Query → TCM Query
 checkQuery (B.vNNLibQuery ver networks assertions) = do
   networks' ← checkNetworks networks
-  assertions' ← checkAssertions (toNetworkContext networks') assertions
-  return (query networks' assertions')
+  equivalences' ← checkValidEquivalences networks'
+  assertions' ← checkAssertions networks' assertions
+  return (query networks' assertions' equivalences')
 
 parseQuery : String → String ⊎ Query
 parseQuery queryStr with B.parseQuery queryStr

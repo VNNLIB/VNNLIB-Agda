@@ -6,6 +6,7 @@ module VNNLIB.Theories.MultipleInputsOutputs
 
 open import Data.Unit.Base using (⊤)
 open import Data.List.NonEmpty using (length)
+open import Data.List.Relation.Unary.All using (All)
 open import Data.Product.Base using (_×_)
 open import Relation.Unary
 open import Relation.Binary.PropositionalEquality using (_≡_)
@@ -32,8 +33,8 @@ SingleInputOutput network =
 
 -- A query lives in the SIO theory 
 SingleInputsOutputsTheory : Theory
-SingleInputsOutputsTheory (query networks _) =
-  AllNetworks SingleInputOutput (toNetworkContext networks)
+SingleInputsOutputsTheory (query networks _ _) =
+  All SingleInputOutput networks
 
 ---------
 -- MIO --

@@ -47,22 +47,22 @@ AtMostOne P [] = ⊤
 AtMostOne P (x ∷ xs) = (P x × All (λ y → P y → ⊥) xs) ⊎ ((P x → ⊥) × AtMostOne P xs)
 
 NetworksPredicate : Set₁
-NetworksPredicate = Pred NetworkContext⁺ 0ℓ
+NetworksPredicate = Pred NetworkDeclarations 0ℓ
 
 AssertionPredicate : Set₁
 AssertionPredicate = IPred Assertion 0ℓ
 
 AllAssertions : AssertionPredicate → Query → Set
-AllAssertions P (query _ assertions) = All P assertions
+AllAssertions P (query _ assertions _) = All P assertions
 
 -------------------------------------
 -- Traverse Arithmetic Expressions --
 -------------------------------------
 
-ArithExprPredicate : NetworkContext → Set₁
+ArithExprPredicate : NetworkDeclarations → Set₁
 ArithExprPredicate Γ = IPred (ArithExpr Γ) 0ℓ
 
-module _ (Γ : NetworkContext) (P₁ P₂ : ArithExprPredicate Γ) where
+module _ (Γ : NetworkDeclarations) (P₁ P₂ : ArithExprPredicate Γ) where
   satisfiesBothArithExpr : ∀ {τ} → CompExpr Γ τ → Set
   satisfiesBothArithExpr (greaterThan x x₁)  = P₁ x × P₂ x₁
   satisfiesBothArithExpr (lessThan x x₁)     = P₁ x × P₂ x₁
@@ -78,6 +78,6 @@ module _ (Γ : NetworkContext) (P₁ P₂ : ArithExprPredicate Γ) where
   
     satisfiesArithExpr : BoolExpr Γ → Set
     satisfiesArithExpr (literal x) = ⊤
-    satisfiesArithExpr (comparison (_ , snd)) = satisfiesBothArithExpr snd
+    satisfiesArithExpr (comparison snd) = satisfiesBothArithExpr snd
     satisfiesArithExpr (and x) = satisfiesArithExpr (x .head) × satisfiesArithExpr-list (x .tail)
     satisfiesArithExpr (or x)  = satisfiesArithExpr (x .head) × satisfiesArithExpr-list (x .tail)
