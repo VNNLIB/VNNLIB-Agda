@@ -19,14 +19,16 @@ open import Data.Vec.Base as Vec using (Vec; []; _∷_)
 open import Data.Bool.Base using (Bool)
 open import Data.Product.Base using (Σ; ∃; _×_; _,_; proj₂)
 open import Data.Unit.Base using (⊤)
+open import Data.Sum using (_⊎_)
 open import Level
 open import Relation.Unary.Indexed using (IPred)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Relation.Binary.PropositionalEquality using (_≡_; _≢_)
 open import Function.Base using (const)
 
 open import Data.List.NonEmpty.Relation.Unary.Any using () renaming (Any to Any⁺)
 open import Data.List.NonEmpty.Membership.Propositional using () renaming (_∈_ to _∈⁺_)
 open import Data.Real
+open import Data.List.Relation.Binary.AllPairs using (AllPairs)
 open import Data.Tensor using (TensorShape; TensorIndices)
 
 open NetworkTheorySyntax theorySyntax
@@ -132,6 +134,9 @@ HasHiddenDeclarationMatching type network = type ∈ typeOfHiddenNodes network
 HasOutputDeclarationMatching : TensorType ElementType → NetworkPredicate
 HasOutputDeclarationMatching type network = type ∈⁺ typeOfOutputs network
 
+HiddenNodePairCompatible : HiddenDeclaration → HiddenDeclaration → Set
+HiddenNodePairCompatible h₁ h₂ = nodeOutputName h₁ ≢ nodeOutputName h₂ ⊎ hiddenType h₁ ≡ hiddenType h₂
+  
 ----------------------------
 -- Equivalence statements --
 ----------------------------
@@ -145,6 +150,7 @@ record ValidEqualToTarget (name : Name) (d : NetworkDeclaration) (target : Netwo
     targetIsNotAnEquivalence : NetworkDeclaration.equivalence target ≡ none
     targetTypesMatch : NetworkTypesMatch (typeOfNetwork d) (typeOfNetwork target)
     targetNamesMatch : name ≡ networkName target
+    targetHiddenNodesCompatible : AllPairs HiddenNodePairCompatible (hiddenDeclarations d) (hiddenDeclarations target)
 
 -- A valid isomorphic network reference has the same network shape
 record ValidIsomorphicToTarget (name : Name) (d : NetworkDeclaration) (target : NetworkDeclaration) : Set where

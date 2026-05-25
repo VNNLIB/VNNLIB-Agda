@@ -128,7 +128,7 @@ variablesDeclared n = do
   let inputNames = List.map inputName (List⁺.toList $ inputDeclarations n)
   let hiddenNames = List.map hiddenName (hiddenDeclarations n)
   let outputNames = List.map outputName (List⁺.toList $ outputDeclarations n)
-  networkName n ∷ List.concat (inputNames ∷ outputNames ∷ [])
+  networkName n ∷ List.concat (inputNames ∷ hiddenNames ∷ outputNames ∷ [])
 
 allVariablesDeclared : NetworkDeclarations → List Name
 allVariablesDeclared [] = []
