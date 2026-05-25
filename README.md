@@ -21,9 +21,7 @@ It includes:
 
 | VNNLIB-Agda version | VNNLIB version |
 | --- | --- |
-| v1.0 | v2.0 |
-| v1.1 | v2.0 |
-| v1.2 | v2.0 |
+| v1.0.0 - v1.1.1 | v2.0 |
 
 ## Requirements
 
