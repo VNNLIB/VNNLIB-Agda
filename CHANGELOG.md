@@ -2,7 +2,7 @@
 
 * Fixed bug where hidden node names weren't getting parsed correctly.
 
-* Fixed bug where `(equal-to X)` targets weren't enforcing hidden node compatability of the hidden node declarations.
+* Fixed bug where `(equal-to X)` targets weren't enforcing hidden node compatibility of the hidden node declarations.
 
 # Version 1.1
 

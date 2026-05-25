@@ -30,6 +30,7 @@ open import Effect.Monad
 open import Function.Base using (_$_; _∘_; case_of_; flip)
 import Relation.Nullary.Decidable as Dec
 open import Data.List.Relation.Unary.Unique.DecPropositional using (unique?)
+import Relation.Binary.Construct.Union as ⊎ using (decidable)
 
 open import Data.Tensor as 𝐓
 open import Data.RationalUtils
@@ -37,6 +38,7 @@ open import Data.FloatUtils
 import Data.List.NonEmpty.Relation.Unary.Any as Any⁺
 import Data.List.NonEmpty.Membership.Propositional as Any⁺
 open import Data.ReadUtils
+open import Data.List.Relation.Binary.AllPairs
 
 import VNNLIB.Grammar.AST as B
 import VNNLIB.Grammar.Parser as B using (parseQuery; Err)
@@ -136,7 +138,7 @@ allVariablesDeclared (x ∷ Γ) = variablesDeclared x List.++ allVariablesDeclar
 
 isTensorTypeEqual : DecidableEquality (TensorType ElementType)
 isTensorTypeEqual (tensorType tensorType₁ tensorDims₁) (tensorType tensorType₂ tensorDims₂)
-  with tensorType₁ Theory.≟ tensorType₂ | tensorDims₁ shape-≟ tensorDims₂
+  with tensorType₁ Theory.≟-ElementType tensorType₂ | tensorDims₁ shape-≟ tensorDims₂
 ... | yes p | yes t = yes (cong₂ tensorType p t)
 ... | no ¬p | _     = no λ {refl → ¬p refl} 
 ... | _     | no ¬t = no λ {refl → ¬t refl}
@@ -165,6 +167,11 @@ checkTargetNetworkEquivStatements (declareNetwork _ _ _ _ equiv) with equiv
 ... | none = just refl
 ... | _    = nothing
 
+checkHiddenNodePairCompatible : Decidable HiddenNodePairCompatible
+checkHiddenNodePairCompatible = ⊎.decidable
+  (λ x y → ¬? ((nodeOutputName x) Theory.≟-NodeOutputName (nodeOutputName y)))
+  (λ x y → isTensorTypeEqual (hiddenType x) (hiddenType y))
+
 lookupEqualNetwork :
   (Γ : NetworkDeclarations) →
   (name : Name) →
@@ -175,9 +182,10 @@ lookupEqualNetwork (d₂ ∷ Γ) name d₁
   with name String.≟ networkName d₂
      | checkTargetNetworkEquivStatements d₂
      | isNetworkTypeEqual (typeOfNetwork d₁) (typeOfNetwork d₂)
-... | no _       | _       | _       = Maybe.map there (lookupEqualNetwork Γ name d₁)
-... | yes nameEq | just e₁ | yes e₂ = just (here (validEqualTo e₁ e₂ nameEq))
-... | yes _      | _       | _       = nothing
+     | allPairs? checkHiddenNodePairCompatible (hiddenDeclarations d₁) (hiddenDeclarations d₂)
+... | no _       | _       | _       | _      = Maybe.map there (lookupEqualNetwork Γ name d₁)
+... | yes nameEq | just e₁ | yes e₂  | yes e₃ = just (here (validEqualTo e₁ e₂ nameEq e₃))
+... | yes _      | _       | _       | _      = nothing
 
 lookupIsomorphicNetwork :
   (Γ : NetworkDeclarations) →
@@ -361,11 +369,11 @@ module _ (Γ : NetworkDeclarations) where
 
     inferList⁺ArithExpr : List B.ArithExpr → Inference (λ τ → List⁺ (ArithExpr Γ τ))
     inferList⁺ArithExpr [] = knownType $ throw "Boolean operators must have at least one argument"
-    inferList⁺ArithExpr (x ∷ xs) = zipInference Theory._≟_ _∷_ (inferArithExpr x) (inferListArithExpr xs)
+    inferList⁺ArithExpr (x ∷ xs) = zipInference Theory._≟-ElementType_ _∷_ (inferArithExpr x) (inferListArithExpr xs)
     
     inferListArithExpr : List B.ArithExpr → Inference (λ τ → List (ArithExpr Γ τ))
     inferListArithExpr []        = unknownType $ λ τ → return [] 
-    inferListArithExpr (x ∷ xs) = zipInference Theory._≟_ _∷_ (inferArithExpr x) (inferListArithExpr xs)
+    inferListArithExpr (x ∷ xs) = zipInference Theory._≟-ElementType_ _∷_ (inferArithExpr x) (inferListArithExpr xs)
 
   checkComparison :
     ({τ : ElementType} → ArithExpr Γ τ → ArithExpr Γ τ → CompExpr Γ τ) →
@@ -373,7 +381,7 @@ module _ (Γ : NetworkDeclarations) where
     B.ArithExpr →
     TCM (Σ ElementType (CompExpr Γ))
   checkComparison f e₁ e₂ = do
-    let inference = zipInference Theory._≟_ f (inferArithExpr e₁) (inferArithExpr e₂)
+    let inference = zipInference Theory._≟-ElementType_ f (inferArithExpr e₁) (inferArithExpr e₂)
     case inference of λ where
       (unknownType _) → throw "unable to infer the type of the arithmetic expression"
       (knownType action) → action
