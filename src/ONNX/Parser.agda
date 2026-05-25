@@ -19,4 +19,5 @@ record NetworkTheoryParser : Set where
     readNumber : (τ : ElementType) → String → Maybe (TheoryTensor (tensorType τ []))
     readNodeOutputName : String → Maybe NodeOutputName
     
-    _≟_ : DecidableEquality ElementType
+    _≟-ElementType_ : DecidableEquality ElementType
+    _≟-NodeOutputName_ : DecidableEquality NodeOutputName
